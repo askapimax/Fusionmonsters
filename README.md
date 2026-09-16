@@ -12,9 +12,13 @@ together, without needing to ask.
 
 ## Status
 
-Pre-alpha. Currently only project scaffolding (README, license, gitignore)
-exists — no code yet. Design decisions below are the accepted direction for
-the game as of this writing, not aspirational/optional ideas.
+Pre-alpha. The procedural monster catalogs (parts/types/moves/traits) and
+the breeding/genetics engine are implemented and tested (see
+[Procedural Graphics & Data Catalogs](#procedural-graphics--data-catalogs-implemented)
+below) behind a debug Phaser scene — there is no actual overworld, battle
+system, or spawn/respawn implementation yet. See [TODO.md](TODO.md) for the
+current task breakdown. Design decisions below are the accepted direction
+for the game as of this writing, not aspirational/optional ideas.
 
 ## Elevator Pitch
 
@@ -112,6 +116,28 @@ battle and then using a capture item gives a chance to catch it, scaled by
 remaining HP, status effects, and item strength — the familiar
 weaken-then-throw-a-ball loop, renamed to fit the setting (capture devices
 are Concord-issued "sample kits").
+
+## Spawns & Named Bosses
+
+Wild-area encounters follow an EverQuest-style spawn model rather than a
+single random-encounter roll per step:
+
+- **Every regular (non-named) mob respawns exactly 2 minutes** after being
+  caught or defeated. This is a flat, global rule — no per-species or
+  per-zone tuning.
+- Each zone/dungeon has its own **spawn table**: the set of Fusions that
+  can appear there, each with its own spawn probability, so some species
+  are common in a given zone and others are rare finds. (Mechanically this
+  reuses the same weighted-random pattern the part catalog already uses
+  for `rarityWeight` — see [Procedural Graphics & Data Catalogs](#procedural-graphics--data-catalogs-implemented).)
+- Every dungeon/zone also has one or more **named bosses**: a unique,
+  hand-placed Fusion (not just a leveled-up regular mob) that always drops
+  **special, guaranteed loot** — a rare part, a guaranteed-dominant allele,
+  or a unique cosmetic variant not obtainable from normal wild breeding.
+  Named bosses are placeholders for now: which bosses exist, their exact
+  loot tables, and their respawn timers (longer than the 2-minute standard,
+  exact value TBD per boss) are not yet defined and need to be designed and
+  tuned later.
 
 ## Breeding & Genetics
 
