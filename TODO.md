@@ -12,8 +12,10 @@ reality.
 - [x] Project scaffolding: TypeScript + Vite + Phaser 3, `npm run dev` /
       `build` / `typecheck` / `test`.
 - [x] Part catalog (`src/data/parts.ts`): 8 heads, 8 bodies, 8 legs, 8 wings
-      (incl. "none"), each an SVG fragment + dominance rank + rarity weight
-      + stat modifiers.
+      (incl. "none"), each a retro pixel-art sprite (via the
+      `src/render/pixelArt.ts` toolkit: outlined silhouettes, a consistent
+      4-tone palette per part, short/stubby Pokemon-style leg proportions)
+      + dominance rank + rarity weight + stat modifiers.
 - [x] Type catalog (`src/data/types.ts`): 9 breedable types in an
       effectiveness cycle + mutation-only `void` type.
 - [x] Move catalog (`src/data/moves.ts`): 3 moves per type, one recessive
@@ -79,8 +81,12 @@ reality.
 - [ ] Decide on and build the game's main menu / UI shell.
 
 ### Art & Audio
-- [ ] Replace placeholder geometric SVG parts with real art (or decide to
-      keep the procedural-geometric look intentionally).
+- [ ] The 32 parts are still placeholder pixel art (simple hand-authored
+      silhouettes generated via `pixelArt.ts`, not a dedicated artist
+      pass) - revisit once a final visual style/tile size for the
+      overworld is locked in, so parts match it exactly.
+- [ ] Design the actual overworld tileset/world graphics in the same
+      pixel-art style, and confirm the parts' pixel size lines up with it.
 - [ ] Sound effects / music.
 
 ### Engineering

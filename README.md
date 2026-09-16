@@ -189,10 +189,16 @@ this is also how the "graphics gene" is inherited. This part of the design
 is implemented in code, not just described here; see `src/`.
 
 - **`src/data/parts.ts`** — the part catalog: 8 heads, 8 bodies, 8 legs, and
-  8 wing variants (one of which is "no wings"), each a small hand-authored
-  SVG fragment plus a dominance rank, a rarity weight, and small stat
-  modifiers. A Fusion's visible body is one head + one body + one legs +
-  one wings, each independently inherited.
+  8 wing variants (one of which is "no wings"), each a small retro
+  pixel-art sprite (chunky flat-colored pixels with a dark outline, in the
+  same style a Pokemon-like tile/sprite world would use) plus a dominance
+  rank, a rarity weight, and small stat modifiers. A Fusion's visible body
+  is one head + one body + one legs + one wings, each independently
+  inherited. The parts are still SVG under the hood - each "pixel" is a
+  small `<rect>` - authored via the toolkit in `src/render/pixelArt.ts`
+  (`buildBlob`/`buildRows` for silhouettes, `applyOverrides` for
+  eyes/decorations/shading, `buildPalette` for a consistent outline/base/
+  shadow/highlight ramp per part), not hand-drawn pixel-by-pixel.
 - **`src/data/types.ts`** — the 9 breedable elemental types plus **void**,
   a mutation-only type representing the Unraveling's corruption (it can
   never be inherited normally, only introduced by mutation). Includes the
