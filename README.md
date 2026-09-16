@@ -97,23 +97,29 @@ the Reach, implemented as a real playable (if content-light) zone rather
 than just described here - see `src/world/startingZone.ts` and
 `src/scenes/WorldScene.ts`. This is what `npm run dev` currently boots into.
 
-- A hand-laid 40x30 tile map: grass, a dirt path, a small pond, three tall-
-  grass patches (future wild-encounter zones, not wired up yet), a
-  signpost, and a small Concord field office (roof/wall/door tiles) the
-  player starts right in front of, boxed in by a tree border with a gap at
-  the south edge implying the road continues into content that doesn't
-  exist yet.
-- Tiles (`src/data/tiles.ts`) use the same pixel-art toolkit and pixel size
-  as Fusion parts (`src/render/pixelArt.ts`), so the world and the
-  creatures are visually one style, not two.
-- A placeholder player character (`src/data/character.ts`): a single
-  default appearance (no character-creation choices yet), with three
-  generated sprites (front/back/side, side gets mirrored for left vs.
-  right - the same trick Fusion parts use).
+- A hand-laid 40x30 tile map: grass, a dirt path, a small pond, three
+  tall-grass patches (future wild-encounter zones, not wired up yet), and
+  a small Concord field office the player starts right in front of, plus
+  scattered trees. There's no hard border - the map just runs out at its
+  edges, which is an honest reflection of there being no further zones yet
+  rather than a designed boundary.
+- Unlike the procedural Fusion parts, world art is **real pixel art**, not
+  generated: `src/data/tiles.ts` (ground) and `src/data/props.ts` (trees,
+  the field office - bigger multi-tile objects placed on top of the
+  ground layer, listed per-instance in `src/world/startingZone.ts`) load
+  actual PNGs from `public/assets/`, sourced from the open-source Tuxemon
+  project. See `public/assets/CREDITS.md` for exact source/license per
+  file (mostly CC BY-SA 4.0) - this is a different license than this
+  repo's own Apache-2.0 code, so keep that file's terms in mind before
+  redistributing those specific assets.
+- The placeholder player character (`src/data/character.ts`) is likewise
+  a real 4-direction x 3-frame walk-cycle spritesheet (one default look,
+  no character-creation choices yet), also from Tuxemon.
 - Movement is classic tile-grid stepping (one tile per key-tap or per
-  ~160ms while a direction is held), with per-tile collision (trees,
-  water, and the building block movement; grass/path/tall grass don't),
-  and the camera follows the player with bounds clamped to the map edge.
+  ~160ms while a direction is held) with a real walk animation while
+  moving, per-tile collision (water and prop footprints block movement;
+  grass/path/tall grass don't), and the camera follows the player,
+  zoomed in 3x, with bounds clamped to the map edge.
 
 Run it: `npm install && npm run dev`.
 

@@ -1,80 +1,36 @@
-import { renderPixelGrid, type PixelPalette } from '../render/pixelArt';
-
 /**
- * Placeholder player sprite - a single default look (no character creation
- * yet, per the current scope: get a character walking around the world
- * first, build appearance choices later). Same pixel-art toolkit and pixel
- * size as tiles/Fusion parts, so it reads as part of the same world.
+ * Placeholder player character - a single default look (no character
+ * creation yet). Real pixel-art spritesheet from the Tuxemon project
+ * ("adventurer" overworld sheet) - see public/assets/CREDITS.md for
+ * source/license (CC BY-SA 4.0).
  *
- * Only three textures are generated: down/up (front/back) and a single
- * side profile that gets mirrored for left vs. right (same trick the
- * Fusion parts use for legs/wings).
+ * Sheet layout: 4 rows (down, left, right, up) x 3 columns
+ * (walk1, idle, walk2), 16x32 per frame.
  */
 
-const CHAR_PIXEL = 3;
-export const CHAR_COLS = 10;
-export const CHAR_ROWS = 14;
+export const CHARACTER_TEXTURE_KEY = 'player-adventurer';
+export const CHARACTER_SHEET_URL = 'assets/sprites/adventurer.png';
+export const CHAR_FRAME_WIDTH = 16;
+export const CHAR_FRAME_HEIGHT = 32;
 
-const CHAR_PALETTE: PixelPalette = {
-  h: '#4a3626', // hair
-  s: '#e0b088', // skin
-  e: '#1a1a1a', // eyes
-  b: '#3f7f6b', // Concord field uniform
-  k: '#2a2a2a', // belt
-  p: '#39506b', // pants
-  f: '#2a2a2a', // shoes
-};
+export type FacingDirection = 'down' | 'left' | 'right' | 'up';
 
-function grid(rows: string[], label: string): string[] {
-  rows.forEach((row, i) => {
-    if (row.length !== CHAR_COLS) {
-      throw new Error(`${label} row ${i} has length ${row.length}, expected ${CHAR_COLS}: "${row}"`);
-    }
-  });
-  if (rows.length !== CHAR_ROWS) {
-    throw new Error(`${label} has ${rows.length} rows, expected ${CHAR_ROWS}`);
-  }
-  return rows;
+export interface FacingFrames {
+  idle: number;
+  walk1: number;
+  walk2: number;
 }
 
-const BASE_ROWS = [
-  '..hhhhhh..',
-  '.hssssssh.',
-  '.hsessesh.', // front: two eyes
-  '..ssssss..',
-  '..bbbbbb..',
-  '.bbbbbbbb.',
-  '.bbbbbbbb.',
-  '.bbbbbbbb.',
-  '..bbbbbb..',
-  '..bkkkkb..',
-  '..pp..pp..',
-  '..pp..pp..',
-  '..pp..pp..',
-  '..ff..ff..',
-];
-
-const DOWN_ROWS = grid(BASE_ROWS, 'player-down');
-
-const UP_ROWS = grid(
-  [...BASE_ROWS.slice(0, 2), '.hssssssh.', ...BASE_ROWS.slice(3)], // back of the head: no face
-  'player-up',
-);
-
-const SIDE_ROWS = grid(
-  [...BASE_ROWS.slice(0, 2), '.hsssessh.', ...BASE_ROWS.slice(3)], // profile: one eye
-  'player-side',
-);
-
-function characterSVG(rows: string[]): string {
-  const width = CHAR_COLS * CHAR_PIXEL;
-  const height = CHAR_ROWS * CHAR_PIXEL;
-  const body = renderPixelGrid(rows, CHAR_PALETTE, CHAR_PIXEL, 0, 0);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${body}</svg>`;
-}
-
-export const CHARACTER_SPRITES: Record<'down' | 'up' | 'side', string> = {
-  down: characterSVG(DOWN_ROWS),
-  up: characterSVG(UP_ROWS),
-  side: characterSVG(SIDE_ROWS),
+const ROW_BASE: Record<FacingDirection, number> = {
+  down: 0,
+  left: 3,
+  right: 6,
+  up: 9,
 };
+
+export const FACING_FRAMES: Record<FacingDirection, FacingFrames> = Object.fromEntries(
+  Object.entries(ROW_BASE).map(([direction, base]) => [
+    direction,
+    { walk1: base, idle: base + 1, walk2: base + 2 },
+  ]),
+) as Record<FacingDirection, FacingFrames>;

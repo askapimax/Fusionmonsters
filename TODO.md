@@ -35,20 +35,25 @@ reality.
       end to end, verified visually via a headless-browser render.
 - [x] Vitest suite for the breeding engine (dominance, mutation bounds,
       dual-type carrier behavior, registry de-duplication).
-- [x] Tile catalog (`src/data/tiles.ts`): grass/flower/tall-grass/path/
-      water/tree/wall/roof/door/sign, same pixel-art toolkit and pixel
-      size as Fusion parts, each with a `solid` collision flag.
+- [x] Tile catalog (`src/data/tiles.ts`) and prop catalog
+      (`src/data/props.ts`): grass/tall-grass/path/water tiles plus
+      tree/field-office props, each with a `solid`/footprint collision
+      flag. Real pixel art from the Tuxemon project (public/assets/,
+      see CREDITS.md), not procedurally generated - swapped out after
+      the first procedural-tile pass looked too rough.
 - [x] First zone map (`src/world/startingZone.ts`): a hand-laid 40x30
       "Fernbrook Outpost" - path, pond, tall-grass patches, a small
-      Concord field office, tree border with a south gap.
+      Concord field office, scattered trees.
 - [x] Placeholder player character (`src/data/character.ts`): single
-      default appearance, front/back/side pixel sprites (side mirrors for
-      left/right).
+      default appearance, real 4-direction x 3-frame walk-cycle
+      spritesheet (Tuxemon "adventurer"), animated while moving.
 - [x] `WorldScene` (`src/scenes/WorldScene.ts`, now the default boot
-      scene): tile-grid movement (arrow keys/WASD), per-tile collision,
-      camera follow with map bounds. Verified visually via headless
-      browser (spawn, walking, direction-facing, and blocked-by-building
-      collision all checked).
+      scene): tile-grid movement (arrow keys/WASD) with walk animation,
+      per-tile + per-prop-footprint collision, camera follow zoomed 3x
+      with map bounds. Verified visually via headless browser at every
+      step (spawn, walking, direction-facing, collision, and a full
+      zoomed-out map render to catch a tall-grass texture bug before
+      it shipped).
 
 ## To Do
 
@@ -100,12 +105,19 @@ reality.
 - [ ] Decide on and build the game's main menu / UI shell.
 
 ### Art & Audio
-- [ ] The 32 parts are still placeholder pixel art (simple hand-authored
-      silhouettes generated via `pixelArt.ts`, not a dedicated artist
-      pass) - revisit once a final visual style/tile size for the
-      overworld is locked in, so parts match it exactly.
-- [ ] Design the actual overworld tileset/world graphics in the same
-      pixel-art style, and confirm the parts' pixel size lines up with it.
+- [ ] The 32 Fusion parts are still procedurally-generated pixel art
+      (simple hand-authored silhouettes via `pixelArt.ts`), which now
+      looks noticeably rougher than the real Tuxemon-sourced world/
+      character art. Worth either commissioning/finding real monster
+      sprites to match, or deliberately re-polishing the generator.
+- [ ] The world tiles/props/character are borrowed from another project
+      (Tuxemon, CC BY-SA 4.0 / XYG license - see public/assets/CREDITS.md)
+      as a stand-in. Fine for prototyping, but a real game needs either a
+      license-compliant release story for these exact files or original
+      replacements before shipping.
+- [ ] Only 4 ground tiles + 2 props exist (grass/tall grass/path/water,
+      tree/field office). No dedicated sign, fence, second building, or
+      any indoor tileset yet.
 - [ ] Sound effects / music.
 
 ### Engineering

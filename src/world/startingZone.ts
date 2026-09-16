@@ -1,19 +1,20 @@
+import type { PropPlacement } from '../data/props';
 import type { TileId } from '../data/tiles';
 
 /**
  * The game's first zone: "Fernbrook Outpost", a small Concord waystation at
  * the edge of the Reach. This is where a new Splicer's journey begins -
- * see README.md "Setting" / "Player's role". Layout, building placement,
- * and tall-grass patches here are a first pass, not final level design.
+ * see README.md "Setting" / "Player's role". Layout, prop placement, and
+ * tall-grass patches here are a first pass, not final level design.
  */
 
 export const ZONE_NAME = 'Fernbrook Outpost';
 export const MAP_COLS = 40;
 export const MAP_ROWS = 30;
 
-export const SPAWN = { col: 20, row: 5 };
+export const SPAWN = { col: 20, row: 9 };
 
-function buildStartingZone(): TileId[][] {
+function buildGround(): TileId[][] {
   const map: TileId[][] = Array.from({ length: MAP_ROWS }, () =>
     Array.from({ length: MAP_COLS }, () => 'grass' as TileId),
   );
@@ -32,28 +33,8 @@ function buildStartingZone(): TileId[][] {
     }
   };
 
-  // Border trees, boxing in this first zone.
-  rect(0, 0, 0, MAP_COLS - 1, 'tree');
-  rect(MAP_ROWS - 1, 0, MAP_ROWS - 1, MAP_COLS - 1, 'tree');
-  rect(0, 0, MAP_ROWS - 1, 0, 'tree');
-  rect(0, MAP_COLS - 1, MAP_ROWS - 1, MAP_COLS - 1, 'tree');
-
-  // A gap in the south border - the road out of Fernbrook continues here,
-  // into content that doesn't exist yet.
-  set(MAP_ROWS - 1, 20, 'grass');
-  set(MAP_ROWS - 1, 21, 'grass');
-
-  // The Concord field office the player starts in front of.
-  rect(3, 19, 3, 21, 'roof');
-  set(4, 19, 'wall');
-  set(4, 20, 'door');
-  set(4, 21, 'wall');
-
   // The path from the field office's door down to the south gap.
-  rect(5, 20, MAP_ROWS - 2, 21, 'path');
-
-  // A signpost next to the path near spawn.
-  set(6, 22, 'sign');
+  rect(8, 20, MAP_ROWS - 1, 21, 'path');
 
   // Tall-grass patches (future wild-encounter zones - not wired up yet).
   rect(10, 10, 12, 12, 'tall_grass');
@@ -63,12 +44,30 @@ function buildStartingZone(): TileId[][] {
   // A small pond.
   rect(8, 30, 9, 33, 'water');
 
-  // A few flower accents in the open grass.
-  set(9, 15, 'grass_flower');
-  set(14, 24, 'grass_flower');
-  set(18, 14, 'grass_flower');
-
   return map;
 }
 
-export const STARTING_ZONE_MAP: TileId[][] = buildStartingZone();
+function buildProps(): PropPlacement[] {
+  const props: PropPlacement[] = [
+    // The Concord field office the player starts in front of.
+    { type: 'building', col: 18, row: 3 },
+  ];
+
+  // Trees scattered around the clearing (deliberately not a solid border -
+  // there's no wall around Fernbrook, just open ground fading into
+  // unimplemented content past the map edges).
+  const treeSpots: Array<[number, number]> = [
+    [2, 2], [5, 6], [8, 3], [3, 34], [6, 30], [10, 36],
+    [14, 4], [18, 2], [22, 4], [26, 2],
+    [24, 34], [20, 36], [16, 34],
+    [26, 15], [26, 22],
+  ];
+  for (const [row, col] of treeSpots) {
+    props.push({ type: 'tree', col, row });
+  }
+
+  return props;
+}
+
+export const STARTING_ZONE_GROUND: TileId[][] = buildGround();
+export const STARTING_ZONE_PROPS: PropPlacement[] = buildProps();
