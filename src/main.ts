@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CatalogPreviewScene } from './scenes/CatalogPreviewScene';
+import { WorldScene } from './scenes/WorldScene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -7,5 +7,6 @@ new Phaser.Game({
   height: 480,
   backgroundColor: '#101018',
   parent: 'app',
-  scene: [CatalogPreviewScene],
+  pixelArt: true,
+  scene: [WorldScene],
 });

@@ -35,15 +35,34 @@ reality.
       end to end, verified visually via a headless-browser render.
 - [x] Vitest suite for the breeding engine (dominance, mutation bounds,
       dual-type carrier behavior, registry de-duplication).
+- [x] Tile catalog (`src/data/tiles.ts`): grass/flower/tall-grass/path/
+      water/tree/wall/roof/door/sign, same pixel-art toolkit and pixel
+      size as Fusion parts, each with a `solid` collision flag.
+- [x] First zone map (`src/world/startingZone.ts`): a hand-laid 40x30
+      "Fernbrook Outpost" - path, pond, tall-grass patches, a small
+      Concord field office, tree border with a south gap.
+- [x] Placeholder player character (`src/data/character.ts`): single
+      default appearance, front/back/side pixel sprites (side mirrors for
+      left/right).
+- [x] `WorldScene` (`src/scenes/WorldScene.ts`, now the default boot
+      scene): tile-grid movement (arrow keys/WASD), per-tile collision,
+      camera follow with map bounds. Verified visually via headless
+      browser (spawn, walking, direction-facing, and blocked-by-building
+      collision all checked).
 
 ## To Do
 
 ### World & Exploration
-- [ ] Actual overworld scene(s): tilemaps, towns, routes, wild areas
-      (currently only the debug preview scene exists).
-- [ ] Player movement/collision, camera, scene transitions.
-- [ ] Character creation flow (male/female appearance, name entry).
+- [ ] Character creation flow (male/female appearance, name entry) - the
+      player currently spawns with one fixed default look.
 - [ ] Starter-Fusion selection at story start.
+- [ ] More zones/routes beyond Fernbrook Outpost, and a way to travel
+      between them (the current map's south gap doesn't lead anywhere
+      yet).
+- [ ] NPCs, dialogue, and making the field office enterable (it's
+      currently a solid decorative block).
+- [ ] Walk animation (the character currently just slides tile-to-tile
+      with a static per-direction pose, no leg-cycle frames).
 
 ### Spawns & Encounters
 - [ ] Per-zone spawn tables (which Fusions can appear, with individual

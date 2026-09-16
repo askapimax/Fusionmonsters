@@ -15,10 +15,12 @@ together, without needing to ask.
 Pre-alpha. The procedural monster catalogs (parts/types/moves/traits) and
 the breeding/genetics engine are implemented and tested (see
 [Procedural Graphics & Data Catalogs](#procedural-graphics--data-catalogs-implemented)
-below) behind a debug Phaser scene — there is no actual overworld, battle
-system, or spawn/respawn implementation yet. See [TODO.md](TODO.md) for the
-current task breakdown. Design decisions below are the accepted direction
-for the game as of this writing, not aspirational/optional ideas.
+below), and there's now a first playable zone with a walking placeholder
+character (see [The First Zone: Fernbrook Outpost](#the-first-zone-fernbrook-outpost-implemented)) -
+but no character creation, battling, capturing, or breeding UI yet, and no
+spawn/respawn implementation. See [TODO.md](TODO.md) for the current task
+breakdown. Design decisions below are the accepted direction for the game
+as of this writing, not aspirational/optional ideas.
 
 ## Elevator Pitch
 
@@ -82,6 +84,38 @@ gyms) runs in parallel with, and eventually converges on, that story.
   (cosmetic only — no mechanical differences between them).
 - Choose a name.
 - You start with a starter Fusion given to you at a Bastion at story start.
+
+Character creation itself (this screen) isn't built yet - see the next
+section: `WorldScene` currently spawns a default-appearance placeholder
+character directly into the world, so world/movement could be built and
+tuned first.
+
+## The First Zone: Fernbrook Outpost (implemented)
+
+The game's actual starting point: a small Concord waystation at the edge of
+the Reach, implemented as a real playable (if content-light) zone rather
+than just described here - see `src/world/startingZone.ts` and
+`src/scenes/WorldScene.ts`. This is what `npm run dev` currently boots into.
+
+- A hand-laid 40x30 tile map: grass, a dirt path, a small pond, three tall-
+  grass patches (future wild-encounter zones, not wired up yet), a
+  signpost, and a small Concord field office (roof/wall/door tiles) the
+  player starts right in front of, boxed in by a tree border with a gap at
+  the south edge implying the road continues into content that doesn't
+  exist yet.
+- Tiles (`src/data/tiles.ts`) use the same pixel-art toolkit and pixel size
+  as Fusion parts (`src/render/pixelArt.ts`), so the world and the
+  creatures are visually one style, not two.
+- A placeholder player character (`src/data/character.ts`): a single
+  default appearance (no character-creation choices yet), with three
+  generated sprites (front/back/side, side gets mirrored for left vs.
+  right - the same trick Fusion parts use).
+- Movement is classic tile-grid stepping (one tile per key-tap or per
+  ~160ms while a direction is held), with per-tile collision (trees,
+  water, and the building block movement; grass/path/tall grass don't),
+  and the camera follows the player with bounds clamped to the map edge.
+
+Run it: `npm install && npm run dev`.
 
 ## Core Gameplay Loop
 
@@ -232,13 +266,14 @@ is implemented in code, not just described here; see `src/`.
   hue/scale jitter (seeded from the genome's own `visualSeed`, so the same
   individual always renders the same way) on top of the inherited part
   choice. This is the "little random factor in addition to inheritance."
-- **`src/scenes/CatalogPreviewScene.ts`** — a debug Phaser scene (not
-  final game UI) that breeds two random wild Fusions together and renders
-  both parents and the offspring on screen, to prove the whole pipeline
-  (catalog → genome → breeding → phenotype → composited texture) actually
-  works end to end. This is what `npm run dev` currently boots into.
+- **`src/scenes/CatalogPreviewScene.ts`** — a debug Phaser scene (not wired
+  into `main.ts` right now, since `WorldScene` is the active boot scene -
+  see "The First Zone" above) that breeds two random wild Fusions together
+  and renders both parents and the offspring on screen, to prove the whole
+  pipeline (catalog → genome → breeding → phenotype → composited texture)
+  works end to end. Swap it into `main.ts`'s `scene: [...]` list to use it
+  again.
 
-Run it: `npm install && npm run dev`, then open the printed local URL.
 `npm test` runs the breeding-engine unit tests (dominance expression,
 mutation bounds, dual-typing carrier behavior, registry de-duplication).
 
