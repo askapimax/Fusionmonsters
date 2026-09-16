@@ -15,7 +15,14 @@
       #game-root {
         display: flex;
         flex-direction: column;
-        height: 100vh;
+        /* Mobile browsers (esp. Chrome/Android) collapse/expand their
+           address bar as you scroll, and 100vh measures the viewport as if
+           that bar were never there - so a 100vh layout runs taller than
+           what's actually visible and the control bar at the bottom gets
+           pushed off-screen. --app-height (set from JS below, from the
+           real window.innerHeight) is the reliable fix; 100dvh is a CSS-only
+           fallback for the instant before that script runs. */
+        height: var(--app-height, 100dvh);
         width: 100vw;
       }
 
@@ -81,6 +88,17 @@
       .dpad-left { top: 52px; left: 0; }
       .dpad-right { top: 52px; left: 104px; }
     </style>
+    <script>
+      // Real fix for the 100vh/100dvh mobile-toolbar issue: measure the
+      // actual visible viewport directly and keep it updated (Chrome fires
+      // 'resize' when its address bar collapses/expands on scroll).
+      function setAppHeight() {
+        document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+      }
+      setAppHeight();
+      window.addEventListener('resize', setAppHeight);
+      window.addEventListener('orientationchange', setAppHeight);
+    </script>
   </head>
   <body>
     <div id="game-root">
