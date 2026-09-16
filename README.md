@@ -309,6 +309,33 @@ No specific hosting/backend decisions have been made yet (e.g. whether save
 data is local-only or server-backed); treat the game as client-side/local
 storage first, and revisit if multiplayer/trading features are added later.
 
+## Playing it online (implemented)
+
+The game auto-deploys to GitHub Pages:
+**https://askapimax.github.io/Fusionmonsters/**
+
+- `.github/workflows/deploy-pages.yml` runs on every push to
+  `claude/monster-game-init-ab1uvs` (this repo's default branch): it
+  installs dependencies, runs `npm run typecheck` and `npm test`, builds
+  with `npm run build`, then publishes `dist/` to the `gh-pages` branch
+  via `peaceiris/actions-gh-pages`.
+- `vite.config.ts` sets `base: '/Fusionmonsters/'` for production builds
+  only (dev keeps `base: '/'`, so `npm run dev` is unaffected) - without
+  it, asset URLs would resolve against the domain root instead of the
+  Pages subpath and everything would 404.
+- One manual, one-time step this repo's own settings have to do (no
+  tool here can flip it): in **Settings → Pages**, set
+  **Build and deployment → Source** to **Deploy from a branch**, branch
+  **gh-pages**, folder **/ (root)**. The `gh-pages` branch itself doesn't
+  exist until the workflow's first run creates it, so this dropdown has
+  nothing to point at before that.
+- Verified locally before relying on CI: built with the real `base`,
+  served the `dist/` output from a plain static file server nested under
+  a `/Fusionmonsters/` path (not `vite preview`, which has its own
+  unrelated dev-server quirks under a non-root base) to match how GitHub
+  Pages actually serves it, and confirmed the game boots and is playable
+  there via a headless browser.
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).

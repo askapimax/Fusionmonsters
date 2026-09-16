@@ -126,6 +126,14 @@ reality.
 - [ ] Sound effects / music.
 
 ### Engineering
-- [ ] CI (typecheck + test on push).
+- [x] CI + deploy: `.github/workflows/deploy-pages.yml` runs typecheck +
+      test + build on every push to the default branch, then publishes
+      to the `gh-pages` branch. Live at
+      https://askapimax.github.io/Fusionmonsters/ once the one manual
+      Settings → Pages step (see README "Playing it online") is done.
+- [ ] **Manual step needed, not something a push can do**: in the
+      repo's Settings → Pages, set Source to "Deploy from a branch" /
+      `gh-pages` / root - only after the workflow has run at least once
+      (it creates the branch).
 - [ ] Code-split the Phaser bundle (currently a single ~1.5MB chunk per
       `npm run build`; fine for now, revisit before shipping).
