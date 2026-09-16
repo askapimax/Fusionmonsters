@@ -105,11 +105,16 @@ reality.
 - [ ] Decide on and build the game's main menu / UI shell.
 
 ### Art & Audio
-- [ ] The 32 Fusion parts are still procedurally-generated pixel art
-      (simple hand-authored silhouettes via `pixelArt.ts`), which now
-      looks noticeably rougher than the real Tuxemon-sourced world/
-      character art. Worth either commissioning/finding real monster
-      sprites to match, or deliberately re-polishing the generator.
+- [x] Re-polished the procedural Fusion-part generator (`pixelArt.ts`):
+      parts are now built from overlapping ellipses with automatic
+      perimeter outlining and position-based highlight/shadow shading,
+      instead of hand-typed blocky pixel grids - much closer in polish
+      to the real Tuxemon-sourced world/character art. Still procedural
+      by necessity (parts must stay independently swappable for
+      breeding), so a real monster-sprite artist pass is still an
+      option later, but the gap with the rest of the art is much
+      smaller now. Verified via the same catalog-preview + full-Phaser-
+      texture-pipeline check as the world art got.
 - [ ] The world tiles/props/character are borrowed from another project
       (Tuxemon, CC BY-SA 4.0 / XYG license - see public/assets/CREDITS.md)
       as a stand-in. Fine for prototyping, but a real game needs either a
