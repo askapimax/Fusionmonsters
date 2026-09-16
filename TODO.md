@@ -54,6 +54,12 @@ reality.
       step (spawn, walking, direction-facing, collision, and a full
       zoomed-out map render to catch a tall-grass texture bug before
       it shipped).
+- [x] On-screen D-pad controls (`index.html`, `src/input/touchControls.ts`)
+      and a responsive canvas (`Phaser.Scale.FIT`, top-aligned) - playable
+      by touch on mobile and by click or keyboard on desktop. Verified with
+      Playwright's iPhone 13 device emulation and a real (non-instant)
+      held touch press, since a synthetic `.tap()` turned out to be faster
+      than Phaser's update loop and gave a false negative.
 
 ## To Do
 

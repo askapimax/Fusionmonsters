@@ -9,10 +9,18 @@ import {
 } from '../data/character';
 import { PROPS, type PropId } from '../data/props';
 import { TILES, TILE_IDS, TILE_SIZE, type TileId } from '../data/tiles';
+import { touchControls } from '../input/touchControls';
 import { MAP_COLS, MAP_ROWS, SPAWN, STARTING_ZONE_GROUND, STARTING_ZONE_PROPS, ZONE_NAME } from '../world/startingZone';
 
 const MOVE_DURATION = 160;
 const WALK_ANIM_FRAME_RATE = 8;
+
+const DIRECTION_DELTA: Record<FacingDirection, { col: number; row: number }> = {
+  left: { col: -1, row: 0 },
+  right: { col: 1, row: 0 },
+  up: { col: 0, row: -1 },
+  down: { col: 0, row: 1 },
+};
 
 /**
  * The first playable zone. No character creation yet (name/appearance) -
@@ -68,7 +76,7 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setZoom(3);
 
     this.add
-      .text(8, 8, `${ZONE_NAME}\nArrow keys / WASD to move`, { fontSize: '11px', color: '#ffffff' })
+      .text(8, 8, `${ZONE_NAME}\nArrow keys / WASD, or the on-screen D-pad, to move`, { fontSize: '11px', color: '#ffffff' })
       .setScrollFactor(0)
       .setDepth(100);
 
@@ -127,24 +135,7 @@ export class WorldScene extends Phaser.Scene {
   update(): void {
     if (!this.player || this.moving) return;
 
-    let deltaCol = 0;
-    let deltaRow = 0;
-    let direction: FacingDirection | null = null;
-
-    if (this.cursors.left.isDown || this.keyA.isDown) {
-      deltaCol = -1;
-      direction = 'left';
-    } else if (this.cursors.right.isDown || this.keyD.isDown) {
-      deltaCol = 1;
-      direction = 'right';
-    } else if (this.cursors.up.isDown || this.keyW.isDown) {
-      deltaRow = -1;
-      direction = 'up';
-    } else if (this.cursors.down.isDown || this.keyS.isDown) {
-      deltaRow = 1;
-      direction = 'down';
-    }
-
+    const direction = this.getInputDirection();
     if (!direction) {
       this.player.anims.stop();
       this.player.setFrame(FACING_FRAMES[this.facing].idle);
@@ -153,6 +144,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.facing = direction;
 
+    const { col: deltaCol, row: deltaRow } = DIRECTION_DELTA[direction];
     const targetCol = this.gridCol + deltaCol;
     const targetRow = this.gridRow + deltaRow;
     if (!this.isWalkable(targetCol, targetRow)) {
@@ -176,6 +168,14 @@ export class WorldScene extends Phaser.Scene {
         this.player.setFrame(FACING_FRAMES[this.facing].idle);
       },
     });
+  }
+
+  private getInputDirection(): FacingDirection | null {
+    if (this.cursors.left.isDown || this.keyA.isDown) return 'left';
+    if (this.cursors.right.isDown || this.keyD.isDown) return 'right';
+    if (this.cursors.up.isDown || this.keyW.isDown) return 'up';
+    if (this.cursors.down.isDown || this.keyS.isDown) return 'down';
+    return touchControls.direction;
   }
 
   private isWalkable(col: number, row: number): boolean {

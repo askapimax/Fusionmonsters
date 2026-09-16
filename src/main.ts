@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { attachTouchControls } from './input/touchControls';
 import { WorldScene } from './scenes/WorldScene';
 
 new Phaser.Game({
@@ -8,5 +9,16 @@ new Phaser.Game({
   backgroundColor: '#101018',
   parent: 'app',
   pixelArt: true,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    // Center only horizontally - on tall/narrow screens FIT leaves extra
+    // vertical space, and top-aligning keeps that gap next to the control
+    // bar below instead of splitting it above and below the game view.
+    autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,
+    width: 800,
+    height: 480,
+  },
   scene: [WorldScene],
 });
+
+attachTouchControls('touch-controls');

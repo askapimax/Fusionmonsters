@@ -120,6 +120,13 @@ than just described here - see `src/world/startingZone.ts` and
   moving, per-tile collision (water and prop footprints block movement;
   grass/path/tall grass don't), and the camera follows the player,
   zoomed in 3x, with bounds clamped to the map edge.
+- Controls: arrow keys/WASD, or the on-screen D-pad rendered below the
+  game canvas (`index.html` + `src/input/touchControls.ts`) - always
+  shown, not just on touch devices, so it's clickable on desktop too,
+  not only via keyboard. The game canvas itself scales to fit the
+  available space (`Phaser.Scale.FIT`, top-aligned so any leftover
+  space collects next to the control bar instead of above the game
+  view), so this works on both phone and desktop viewports.
 
 Run it: `npm install && npm run dev`.
 
