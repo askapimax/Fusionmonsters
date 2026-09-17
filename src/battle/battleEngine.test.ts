@@ -7,6 +7,8 @@ import type { CycleTypeId } from '../data/types';
 import {
   applyDamage,
   applyMoveEffect,
+  attemptCapture,
+  computeCatchChance,
   computeDamage,
   createCombatant,
   determineTurnOrder,
@@ -182,6 +184,78 @@ describe('determineTurnOrder', () => {
     const [first, second] = determineTurnOrder(fast, slow, () => 0.5);
     expect(first).toBe(fast);
     expect(second).toBe(slow);
+  });
+});
+
+describe('computeCatchChance', () => {
+  it('is very low at full HP with no status', () => {
+    const wild = combatant(110, 'Wild');
+    const chance = computeCatchChance(wild, 1);
+    expect(chance).toBeLessThan(0.1);
+  });
+
+  it('is very high at near-0 HP with a status condition', () => {
+    const wild = combatant(111, 'Wild');
+    wild.currentHp = Math.max(1, Math.round(wild.maxHp * 0.01));
+    wild.status = 'poison';
+    const chance = computeCatchChance(wild, 1);
+    expect(chance).toBeGreaterThan(0.85);
+  });
+
+  it('is a real probability (strictly between 0 and 1) at HP/status midpoints', () => {
+    const halfHpNoStatus = combatant(112, 'Wild');
+    halfHpNoStatus.currentHp = Math.round(halfHpNoStatus.maxHp * 0.5);
+    const chanceA = computeCatchChance(halfHpNoStatus, 1);
+    expect(chanceA).toBeGreaterThan(0);
+    expect(chanceA).toBeLessThan(1);
+
+    const halfHpStatused = combatant(113, 'Wild');
+    halfHpStatused.currentHp = Math.round(halfHpStatused.maxHp * 0.5);
+    halfHpStatused.status = 'burn';
+    const chanceB = computeCatchChance(halfHpStatused, 1);
+    expect(chanceB).toBeGreaterThan(0);
+    expect(chanceB).toBeLessThan(1);
+  });
+
+  it('lower remaining HP always means a better (or equal) chance than higher HP', () => {
+    const lowHp = combatant(114, 'Wild');
+    lowHp.currentHp = Math.round(lowHp.maxHp * 0.1);
+    const highHp = combatant(115, 'Wild');
+    highHp.currentHp = highHp.maxHp;
+    expect(computeCatchChance(lowHp, 1)).toBeGreaterThan(computeCatchChance(highHp, 1));
+  });
+
+  it('a status condition always improves (or keeps equal) the chance over no status', () => {
+    const noStatus = combatant(116, 'Wild');
+    noStatus.currentHp = Math.round(noStatus.maxHp * 0.5);
+    const statused = combatant(117, 'Wild');
+    statused.currentHp = Math.round(statused.maxHp * 0.5);
+    statused.status = 'paralysis';
+    expect(computeCatchChance(statused, 1)).toBeGreaterThan(computeCatchChance(noStatus, 1));
+  });
+
+  it('scales with kit strength and never exceeds the ceiling', () => {
+    const wild = combatant(118, 'Wild');
+    wild.currentHp = 1;
+    wild.status = 'burn';
+    expect(computeCatchChance(wild, 2)).toBeGreaterThan(computeCatchChance(wild, 1));
+    expect(computeCatchChance(wild, 5)).toBeLessThanOrEqual(0.98);
+    expect(computeCatchChance(wild, 0)).toBe(0);
+  });
+});
+
+describe('attemptCapture', () => {
+  it('succeeds when the roll lands under the computed chance', () => {
+    const wild = combatant(119, 'Wild');
+    wild.currentHp = 1;
+    wild.status = 'poison';
+    expect(attemptCapture(wild, 1, () => 0)).toBe(true);
+  });
+
+  it('fails when the roll lands at/above the computed chance', () => {
+    const wild = combatant(120, 'Wild');
+    wild.currentHp = wild.maxHp;
+    expect(attemptCapture(wild, 1, () => 0.999)).toBe(false);
   });
 });
 
