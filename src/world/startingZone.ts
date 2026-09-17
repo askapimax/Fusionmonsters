@@ -192,7 +192,9 @@ export const ZONE_EXITS: ZoneExit[] = [
   // carved-out "door tile" in the footprint itself - instead the open grass
   // tile immediately south of it acts as the doorstep. Stepping onto it
   // transitions into the interior (`./fieldOfficeInterior.ts`), landing one
-  // tile in from its own door. Column 19 is clear of the existing NPC
-  // placement (17, 7) above.
-  { col: 19, row: 7, targetZoneId: 'field_office_interior', targetSpawn: { col: 3, row: 4 } },
+  // tile in from its own door. Column 21 (the building's rightmost column)
+  // is where the door is actually drawn in building.png - the sprite's
+  // door graphic sits in the footprint's last column/row, not centered, so
+  // the doorstep has to line up with that column, not an arbitrary open one.
+  { col: 21, row: 7, targetZoneId: 'field_office_interior', targetSpawn: { col: 3, row: 4 } },
 ];
