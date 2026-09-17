@@ -1,3 +1,4 @@
+import type { NpcId } from '../data/npcs';
 import type { PropPlacement } from '../data/props';
 import type { ZoneId } from '../data/spawnTables';
 import type { TileId } from '../data/tiles';
@@ -113,6 +114,31 @@ function buildTrainers(): TrainerPlacement[] {
 }
 
 export const STARTING_ZONE_TRAINERS: TrainerPlacement[] = buildTrainers();
+
+/**
+ * NPC placements (TODO.md "World & Exploration" - NPC entity system). Each
+ * entry places one catalog entry from `src/data/npcs.ts` at a fixed tile;
+ * `WorldScene` renders it as a static sprite, blocks its tile like a prop,
+ * and lets the player talk to it by facing it and pressing A/Z (see
+ * `WorldScene.buildNpcs`/`maybeTalkToNpc`). Kept Fernbrook-only for now,
+ * the same way `STARTING_ZONE_TRAINERS`/`HEALING_SPOT` above are - NPCs
+ * aren't part of the generic `ZoneDef` shape yet (see `../world/zones.ts`).
+ */
+export interface NpcPlacement {
+  npcId: NpcId;
+  col: number;
+  row: number;
+}
+
+function buildNpcs(): NpcPlacement[] {
+  return [
+    // Just southwest of the field office's door, opposite HEALING_SPOT -
+    // clear of the building footprint, the path, and the healing marker.
+    { npcId: 'fernbrook_field_tech', col: 17, row: 7 },
+  ];
+}
+
+export const STARTING_ZONE_NPCS: NpcPlacement[] = buildNpcs();
 
 /**
  * Zone-transition exits (TODO "Zone-transition system" - mechanism only).
