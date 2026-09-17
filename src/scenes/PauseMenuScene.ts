@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { touchControls } from '../input/touchControls';
+import { saveGame } from '../state/save';
 import { drawPanel, UI_THEME } from '../ui/panel';
 
 const PANEL_X = 560;
@@ -130,12 +131,20 @@ export class PauseMenuScene extends Phaser.Scene {
     this.scene.launch('BreedingScene');
   }
 
+  /**
+   * Real save logic (TODO.md "Persistence & Platform"): serializes the
+   * player's position/appearance/name, roster + storage, inventory, and
+   * registry into one blob and writes it to `localStorage` (see
+   * `src/state/save.ts`), then shows a confirmation notice - same
+   * text/timing pattern the old "Not available yet." placeholder used.
+   */
   showSaveNotice(): void {
+    const success = saveGame();
     this.saveNoticeText?.destroy();
     this.saveNoticeText = this.add
-      .text(PANEL_X + 24, PANEL_Y + PANEL_HEIGHT - 26, 'Not available yet.', {
+      .text(PANEL_X + 24, PANEL_Y + PANEL_HEIGHT - 26, success ? 'Game saved!' : 'Save failed.', {
         fontSize: '11px',
-        color: UI_THEME.textDim,
+        color: success ? UI_THEME.highlight : UI_THEME.textDim,
         fontFamily: UI_THEME.fontFamily,
       })
       .setDepth(201);
