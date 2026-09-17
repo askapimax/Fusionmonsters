@@ -219,7 +219,7 @@ export class CharacterCreationScene extends Phaser.Scene {
     setPlayerAppearance(APPEARANCE_OPTIONS[this.appearanceIndex]);
     const inputEl = this.nameInput.node as HTMLInputElement;
     setPlayerName(inputEl.value);
-    this.scene.start('WorldScene');
+    this.scene.start('StarterSelectionScene');
   }
 
   private releaseTouchHandlers(): void {
