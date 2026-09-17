@@ -8,6 +8,7 @@ import {
   FACING_FRAMES,
   type FacingDirection,
 } from '../data/character';
+import { NPCS } from '../data/npcs';
 import { PROPS, type PropId } from '../data/props';
 import { ZONE_SPAWN_TABLES, type ZoneId } from '../data/spawnTables';
 import { TILES, TILE_IDS, TILE_SIZE, type TileId } from '../data/tiles';
@@ -19,7 +20,8 @@ import { healPlayerFully } from '../state/party';
 import { getPlayerAppearance } from '../state/player';
 import { concordRegistry } from '../state/registry';
 import { UI_THEME } from '../ui/panel';
-import { HEALING_SPOT, STARTING_ZONE_TRAINERS, ZONE_ID } from '../world/startingZone';
+import type { DialogueStartData } from './DialogueScene';
+import { HEALING_SPOT, STARTING_ZONE_NPCS, STARTING_ZONE_TRAINERS, ZONE_ID } from '../world/startingZone';
 import { ZONES, type ZoneDef } from '../world/zones';
 import type { ZoneSpawn } from '../world/zoneTypes';
 
@@ -108,6 +110,7 @@ export class WorldScene extends Phaser.Scene {
     this.buildProps();
     if (this.zoneDef.zoneId === ZONE_ID) {
       this.buildHealingSpot();
+      this.buildNpcs();
     }
     this.createPlayerAnimations();
 
@@ -192,11 +195,39 @@ export class WorldScene extends Phaser.Scene {
     this.blockedTiles.add(`${HEALING_SPOT.col},${HEALING_SPOT.row}`);
   }
 
+  /** NPC entity system (TODO.md "World & Exploration"): renders each
+   * `STARTING_ZONE_NPCS` placement as a static sprite (a single idle frame
+   * from the shared player spritesheet, tinted per `NpcDef.tint` - see
+   * `src/data/npcs.ts` for why there's no dedicated NPC art) posed facing
+   * `NpcDef.facing`, and blocks its tile so the player has to approach and
+   * face it, the same footprint-blocking shape `markFootprintBlocked`/
+   * `buildHealingSpot` already use. Fernbrook-only, matching those two -
+   * only called when `this.zoneDef.zoneId === ZONE_ID`. */
+  private buildNpcs(): void {
+    for (const placement of STARTING_ZONE_NPCS) {
+      const npc = NPCS[placement.npcId];
+      const sprite = this.add
+        .sprite(
+          this.tileCenterX(placement.col),
+          this.tileFloorY(placement.row),
+          CHARACTER_TEXTURE_KEY,
+          FACING_FRAMES[npc.facing].idle,
+        )
+        .setOrigin(0.5, 1)
+        .setDepth(4);
+      if (npc.tint !== null) {
+        sprite.setTint(npc.tint);
+      }
+      this.blockedTiles.add(`${placement.col},${placement.row}`);
+    }
+  }
+
   /** Faces the tile the player is currently facing and, if it's the healing
    * marker, fully restores the active Fusion's HP (see `healPlayerFully`)
-   * with a brief on-screen confirmation. This stands in for a real "Fusion
-   * Center" NPC until the field office has an interior to put one in.
-   * Fernbrook-only, matching `buildHealingSpot`. */
+   * with a brief on-screen confirmation; otherwise, if it's a placed NPC,
+   * starts that NPC's dialogue (see `maybeTalkToNpc`). This stands in for a
+   * real "Fusion Center" NPC until the field office has an interior to put
+   * one in. Fernbrook-only, matching `buildHealingSpot`/`buildNpcs`. */
   private checkInteraction(): void {
     if (this.scene.isPaused() || this.moving || this.zoneDef.zoneId !== ZONE_ID) return;
 
@@ -207,7 +238,32 @@ export class WorldScene extends Phaser.Scene {
     if (facedCol === HEALING_SPOT.col && facedRow === HEALING_SPOT.row) {
       healPlayerFully();
       this.showHealNotice();
+      return;
     }
+
+    this.maybeTalkToNpc(facedCol, facedRow);
+  }
+
+  /** NPC entity system (TODO.md "World & Exploration"): if `(col, row)` has
+   * a placed NPC (`STARTING_ZONE_NPCS`), pauses this scene and launches
+   * `DialogueScene` with that NPC's lines, matching the documented caller
+   * convention in `DialogueScene.ts` (pause first, so the underlying
+   * scene's own input bindings - e.g. this scene's Enter-opens-pause-menu -
+   * don't also react to the same keypress). Resumes this scene, and
+   * re-binds `touchControls.onA` back to `checkInteraction` (see the
+   * `resume` listener in `create()`), once the dialogue box closes. Only
+   * ever called from `checkInteraction`, which already gates on
+   * `this.zoneDef.zoneId === ZONE_ID`. */
+  private maybeTalkToNpc(col: number, row: number): void {
+    const placement = STARTING_ZONE_NPCS.find((npc) => npc.col === col && npc.row === row);
+    if (!placement) return;
+    const npc = NPCS[placement.npcId];
+
+    this.scene.pause();
+    this.scene.launch('DialogueScene', {
+      lines: npc.lines,
+      onDone: () => this.scene.resume(),
+    } satisfies DialogueStartData);
   }
 
   /** Rendered in world-space above the player (not `scrollFactor(0)` HUD
