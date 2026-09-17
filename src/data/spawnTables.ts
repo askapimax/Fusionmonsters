@@ -17,7 +17,7 @@ export interface SpawnTableEntry {
 
 export type SpawnTable = SpawnTableEntry[];
 
-export type ZoneId = 'fernbrook_outpost';
+export type ZoneId = 'fernbrook_outpost' | 'route_one_stub';
 
 export const ZONE_SPAWN_TABLES: Record<ZoneId, SpawnTable> = {
   // Fernbrook Outpost: open grass, tall-grass patches, and a pond - flora
@@ -25,6 +25,25 @@ export const ZONE_SPAWN_TABLES: Record<ZoneId, SpawnTable> = {
   // thermal/mineral/photon (native to biomes this zone doesn't have) are
   // rare finds this far from home.
   fernbrook_outpost: [
+    { type: 'flora', weight: 10 },
+    { type: 'aqua', weight: 8 },
+    { type: 'aero', weight: 6 },
+    { type: 'toxin', weight: 4 },
+    { type: 'ferro', weight: 3 },
+    { type: 'volt', weight: 3 },
+    { type: 'mineral', weight: 2 },
+    { type: 'thermal', weight: 1 },
+    { type: 'photon', weight: 1 },
+  ],
+  // route_one_stub is a placeholder zone proving the zone-transition
+  // mechanism only (see src/world/routeOneStub.ts and TODO.md's
+  // "Zone-transition system" item) - it has no tall-grass encounter tiles
+  // of its own, so this table is never actually rolled against yet. It's
+  // filled in with the same weights as Fernbrook purely so this satisfies
+  // `Record<ZoneId, SpawnTable>` and the "every breedable type is
+  // represented" invariant tested below; real per-zone tuning is part of
+  // the separate "second zone" content TODO item, not this one.
+  route_one_stub: [
     { type: 'flora', weight: 10 },
     { type: 'aqua', weight: 8 },
     { type: 'aero', weight: 6 },
