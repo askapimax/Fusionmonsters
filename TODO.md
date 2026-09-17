@@ -109,26 +109,66 @@ reality.
       currently a solid decorative block).
 
 ### Spawns & Encounters
+- [x] Wild-encounter roll on tall-grass tiles (`TILES[...].encounterZone`,
+      `src/data/wildEncounters.ts`): each step onto one has a flat 12%
+      chance to start a battle against a freshly-generated random founder
+      Fusion. Wired into `WorldScene.maybeTriggerEncounter`, called from
+      the movement-tween's `onComplete` so it can never fire mid-step or
+      while a menu/battle is already open.
 - [ ] Per-zone spawn tables (which Fusions can appear, with individual
       spawn-probability weights — see README "Spawns & Named Bosses").
-- [ ] Global 2-minute respawn timer for regular mobs.
+      Right now any encounter tile in the one zone can produce *any*
+      random founder, with no bias by type/rarity/part.
+- [ ] Global 2-minute respawn timer for regular mobs — moot until there's
+      something zone-persistent to respawn; current wild Fusions are
+      generated fresh per encounter and don't exist in the world otherwise.
 - [ ] Named-boss system: unique hand-placed Fusions per dungeon/zone with
       guaranteed special loot and their own (longer, currently
       placeholder) respawn timers.
 - [ ] Design the actual named bosses per zone and their loot tables (not
       just the system — the content itself).
 - [ ] Wild-encounter → capture flow (weaken, throw a sample kit, catch-rate
-      math).
+      math). A wild encounter currently only ends in a win, a loss, or
+      running away — there's no way to keep the Fusion you just fought.
 
 ### Battling
-- [ ] Turn-based battle scene/UI.
-- [ ] Damage formula using type effectiveness (`getTypeEffectiveness`),
-      stats, and move power/accuracy.
-- [ ] Status effects referenced by move `effect` text (poison, paralysis,
-      burn, stat buffs/debuffs) — currently only described in data, not
-      implemented.
-- [ ] Trainer (rival/Chimera Nine) battles vs. wild battles.
-- [ ] Party management (up to 6 Fusions, switching, fainting).
+- [x] Turn-based battle scene/UI (`src/scenes/BattleScene.ts`), in the
+      same dark-panel/monospace style as the rest of the UI: Pokemon-style
+      layout (wild top-right on its own platform, player bottom-left,
+      flipped to face it), name/type + animated HP bar panels for both,
+      and a message box that advances on A/Enter/click - matching the
+      D-pad/A/B navigation the pause menu already has (`src/ui/panel.ts`
+      reused directly). A 2-column move grid (up to 4 moves + RUN AWAY)
+      replaces the message box once it's the player's turn; RUN AWAY
+      always succeeds (no capture/party system yet to make failure
+      meaningful - see above). Simple tween-based "juice": an intro
+      fade-in, an attack lunge, a hit-flash + camera shake, and an
+      animated HP-bar drain.
+- [x] Damage formula using type effectiveness (`getTypeEffectiveness`),
+      stats, and move power/accuracy, plus same-type-attack-bonus and a
+      basic status-effect layer (heal / stat-stage buffs+debuffs /
+      burn+poison damage-over-time / a paralysis skip chance) mapped from
+      each type's hidden move — see `src/battle/battleEngine.ts` and
+      `src/battle/moveEffects.ts`, with a dedicated Vitest suite
+      (`battleEngine.test.ts`, 18 tests). The damage divisor and status
+      magnitudes are placeholder balance, not final tuning, and status
+      conditions only last for the current battle (nothing persists
+      outside it, e.g. into the overworld or a later encounter).
+- [ ] Trainer (rival/Chimera Nine) battles vs. wild battles - only wild
+      battles exist so far.
+- [ ] Party management (up to 6 Fusions, switching, fainting). The player
+      currently has exactly one battling Fusion, auto-assigned the first
+      time a battle is needed (`src/state/party.ts`) since there's no
+      starter-selection flow yet either (same "skip the unbuilt flow"
+      shortcut WorldScene already took for character creation) - no
+      selection, no roster, no switching mid-battle.
+- [ ] No leveling/XP - by design, a Fusion's power comes from its genome
+      (breeding), not from grinding battles, so winning currently grants
+      no numeric reward at all beyond the win itself. Losing heals the
+      player's Fusion back to full and returns them to the field, since
+      there's no Fusion-Center-equivalent healing economy yet to make a
+      loss otherwise recoverable - a deliberate safety net, not the
+      intended long-term design.
 
 ### Breeding UI & Progression
 - [ ] In-game breeding UI (pick two compatible Fusions, produce an egg,

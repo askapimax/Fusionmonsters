@@ -164,7 +164,8 @@ Run it: `npm install && npm run dev`.
 
 ## Battling
 
-Turn-based combat, one Fusion active per side at a time (party of up to 6).
+Turn-based combat, one Fusion active per side at a time (party of up to 6 -
+see "First pass (implemented)" below for what's actually built today).
 Each Fusion has:
 
 - **Type(s)** — one or two elemental/biological types (e.g. Volt, Flora,
@@ -176,6 +177,33 @@ Each Fusion has:
   it to learn (see Genetics below).
 - **A passive trait** — a single always-on ability (e.g. Regeneration,
   Camouflage, Venomous) inherited from its genome.
+
+### First pass (implemented)
+
+A real, playable 1v1 wild battle exists end to end
+(`src/scenes/BattleScene.ts`, `src/battle/battleEngine.ts`,
+`src/battle/moveEffects.ts`), in the same pixel-art/dark-panel style as the
+rest of the UI, reachable by walking into tall grass (see
+[Spawns & Named Bosses](#spawns--named-bosses) below). What's real vs. still
+the design above:
+
+- One Fusion per side, not a party of 6 - the player is auto-assigned a
+  single random founder Fusion the first time a battle is needed
+  (`src/state/party.ts`), since starter selection/character creation
+  doesn't exist yet either. No switching, no roster.
+- Damage uses type effectiveness, STAB, Physical (Attack/Defense) vs.
+  Special (Focus/Resist) stats, and move accuracy, plus a working (if
+  simplified) status layer: heals, +/-stat stages, burn/poison
+  damage-over-time, and a paralysis skip chance, all mapped from each
+  type's hidden move.
+- Every step is animated: an intro fade-in, an attack lunge, a hit-flash +
+  camera shake, and an HP bar that visibly drains rather than jumping.
+- No capture yet - a battle only ends in a win, a loss (which fully heals
+  the player and returns them to the field, since there's no
+  healing-item economy to make a loss otherwise survivable), or running
+  away (which always succeeds). No trainer battles, only wild ones. No
+  leveling/XP - a Fusion's power is fixed by its genome, so winning grants
+  no numeric reward beyond the win.
 
 ## Catching Fusions
 
@@ -206,6 +234,16 @@ single random-encounter roll per step:
   loot tables, and their respawn timers (longer than the 2-minute standard,
   exact value TBD per boss) are not yet defined and need to be designed and
   tuned later.
+
+**First pass (implemented):** stepping onto a tall-grass tile
+(`TILES[...].encounterZone` in `src/data/tiles.ts`) has a flat 12% chance
+per step to start a battle (`src/data/wildEncounters.ts`,
+`WorldScene.maybeTriggerEncounter`) against one freshly-generated random
+founder Fusion. None of the spawn-table/named-boss/respawn-timer design
+above is wired up yet - every encounter tile in the one existing zone can
+currently produce *any* random Fusion with equal likelihood, and defeated
+wild Fusions don't persist in the world to respawn at all (they're
+generated fresh per encounter, not placed).
 
 ## Breeding & Genetics
 
