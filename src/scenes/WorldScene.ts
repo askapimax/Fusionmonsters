@@ -22,7 +22,12 @@ import { concordRegistry } from '../state/registry';
 import { setWorldPosition } from '../state/worldPosition';
 import { UI_THEME } from '../ui/panel';
 import type { DialogueStartData } from './DialogueScene';
-import { HEALING_SPOT, STARTING_ZONE_NPCS, STARTING_ZONE_TRAINERS, ZONE_ID } from '../world/startingZone';
+import {
+  FIELD_OFFICE_INTERIOR_NPCS,
+  HEALING_SPOT as INTERIOR_HEALING_SPOT,
+  ZONE_ID as FIELD_OFFICE_INTERIOR_ZONE_ID,
+} from '../world/fieldOfficeInterior';
+import { STARTING_ZONE_NPCS, STARTING_ZONE_TRAINERS, ZONE_ID, type NpcPlacement } from '../world/startingZone';
 import { ZONES, type ZoneDef } from '../world/zones';
 import type { ZoneSpawn } from '../world/zoneTypes';
 
@@ -72,10 +77,12 @@ export class WorldScene extends Phaser.Scene {
    * so `this.scene.restart({ zoneId, spawn })` can swap it for a zone
    * transition (TODO "Zone-transition system"); everything below that used
    * to read `startingZone.ts`'s constants directly now reads this instead,
-   * so the scene isn't hardcoded to a single map. The healing marker and
-   * trainer trigger below are still Fernbrook-specific content, so they're
-   * gated on `this.zoneDef.zoneId === ZONE_ID` rather than being part of
-   * the generic `ZoneDef` shape. */
+   * so the scene isn't hardcoded to a single map. The trainer trigger below
+   * is still Fernbrook-specific content, gated on
+   * `this.zoneDef.zoneId === ZONE_ID` rather than being part of the generic
+   * `ZoneDef` shape. The healing marker and NPC placements are gated the
+   * same way, just per-zone (Fernbrook's NPC, the field-office interior's
+   * healing marker + NPC - see `create()`). */
   private zoneDef!: ZoneDef;
 
   constructor() {
@@ -113,9 +120,16 @@ export class WorldScene extends Phaser.Scene {
   create(): void {
     this.buildGroundLayer();
     this.buildProps();
+    // The healing marker/NPC placements below aren't part of the generic
+    // `ZoneDef` shape yet, so each zone that wants either is still gated by
+    // its own `zoneId` check (see the class-level comment on `zoneDef`).
+    // The field-office interior (TODO "Make the Concord field office
+    // enterable") is the second zone to need this, alongside Fernbrook.
     if (this.zoneDef.zoneId === ZONE_ID) {
-      this.buildHealingSpot();
-      this.buildNpcs();
+      this.buildNpcs(STARTING_ZONE_NPCS);
+    } else if (this.zoneDef.zoneId === FIELD_OFFICE_INTERIOR_ZONE_ID) {
+      this.buildHealingSpot(INTERIOR_HEALING_SPOT);
+      this.buildNpcs(FIELD_OFFICE_INTERIOR_NPCS);
     }
     this.createPlayerAnimations();
 
@@ -201,14 +215,15 @@ export class WorldScene extends Phaser.Scene {
 
   /** A small Graphics-drawn healing marker (no real pixel-art asset exists
    * for this yet, matching the plain-shape approach `src/ui/panel.ts` uses
-   * for other object-less UI) placed just outside the field office's door -
-   * see `HEALING_SPOT` in startingZone.ts for why it's outdoors for now.
-   * Blocks its own tile so the player has to approach and face it, the
-   * same interaction shape planned for NPCs (see TODO.md). Fernbrook-only -
-   * only called when `this.zoneDef.zoneId === ZONE_ID`. */
-  private buildHealingSpot(): void {
-    const x = this.tileCenterX(HEALING_SPOT.col);
-    const y = HEALING_SPOT.row * TILE_SIZE + TILE_SIZE / 2;
+   * for other object-less UI) placed at `spot`. Blocks its own tile so the
+   * player has to approach and face it, the same interaction shape NPCs
+   * use. Originally stood just outside the field office's door
+   * (Fernbrook-only) before the interior existed; now placed inside it
+   * instead (see `HEALING_SPOT` in `../world/fieldOfficeInterior.ts`) -
+   * only called when `this.zoneDef.zoneId === FIELD_OFFICE_INTERIOR_ZONE_ID`. */
+  private buildHealingSpot(spot: ZoneSpawn): void {
+    const x = this.tileCenterX(spot.col);
+    const y = spot.row * TILE_SIZE + TILE_SIZE / 2;
     const radius = TILE_SIZE * 0.4;
 
     const marker = this.add.graphics().setDepth(4);
@@ -223,19 +238,21 @@ export class WorldScene extends Phaser.Scene {
     marker.fillRect(x - armThickness / 2, y - armLength / 2, armThickness, armLength);
     marker.fillRect(x - armLength / 2, y - armThickness / 2, armLength, armThickness);
 
-    this.blockedTiles.add(`${HEALING_SPOT.col},${HEALING_SPOT.row}`);
+    this.blockedTiles.add(`${spot.col},${spot.row}`);
   }
 
-  /** NPC entity system (TODO.md "World & Exploration"): renders each
-   * `STARTING_ZONE_NPCS` placement as a static sprite (a single idle frame
-   * from the shared player spritesheet, tinted per `NpcDef.tint` - see
+  /** NPC entity system (TODO.md "World & Exploration"): renders each entry
+   * in `placements` as a static sprite (a single idle frame from the
+   * shared player spritesheet, tinted per `NpcDef.tint` - see
    * `src/data/npcs.ts` for why there's no dedicated NPC art) posed facing
    * `NpcDef.facing`, and blocks its tile so the player has to approach and
    * face it, the same footprint-blocking shape `markFootprintBlocked`/
-   * `buildHealingSpot` already use. Fernbrook-only, matching those two -
-   * only called when `this.zoneDef.zoneId === ZONE_ID`. */
-  private buildNpcs(): void {
-    for (const placement of STARTING_ZONE_NPCS) {
+   * `buildHealingSpot` already use. Called once per zone that has NPC
+   * placements (currently Fernbrook and the field-office interior - see
+   * the `zoneId` gating in `create()`), each passing its own placement
+   * list (`STARTING_ZONE_NPCS`/`FIELD_OFFICE_INTERIOR_NPCS`). */
+  private buildNpcs(placements: NpcPlacement[]): void {
+    for (const placement of placements) {
       const npc = NPCS[placement.npcId];
       const sprite = this.add
         .sprite(
@@ -254,39 +271,47 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** Faces the tile the player is currently facing and, if it's the healing
-   * marker, fully restores the active Fusion's HP (see `healPlayerFully`)
-   * with a brief on-screen confirmation; otherwise, if it's a placed NPC,
-   * starts that NPC's dialogue (see `maybeTalkToNpc`). This stands in for a
-   * real "Fusion Center" NPC until the field office has an interior to put
-   * one in. Fernbrook-only, matching `buildHealingSpot`/`buildNpcs`. */
+   * marker (interior zone only), fully restores the active Fusion's HP
+   * (see `healPlayerFully`) with a brief on-screen confirmation; otherwise,
+   * if it's a placed NPC, starts that NPC's dialogue (see
+   * `maybeTalkToNpc`). Gated to the zones that currently have either
+   * (Fernbrook for its NPC, the field-office interior for both - see the
+   * matching `zoneId` gating in `create()`/`buildHealingSpot`/`buildNpcs`),
+   * since neither is part of the generic `ZoneDef` shape yet. */
   private checkInteraction(): void {
-    if (this.scene.isPaused() || this.moving || this.zoneDef.zoneId !== ZONE_ID) return;
+    if (this.scene.isPaused() || this.moving) return;
+    if (this.zoneDef.zoneId !== ZONE_ID && this.zoneDef.zoneId !== FIELD_OFFICE_INTERIOR_ZONE_ID) return;
 
     const { col: deltaCol, row: deltaRow } = DIRECTION_DELTA[this.facing];
     const facedCol = this.gridCol + deltaCol;
     const facedRow = this.gridRow + deltaRow;
 
-    if (facedCol === HEALING_SPOT.col && facedRow === HEALING_SPOT.row) {
+    if (
+      this.zoneDef.zoneId === FIELD_OFFICE_INTERIOR_ZONE_ID &&
+      facedCol === INTERIOR_HEALING_SPOT.col &&
+      facedRow === INTERIOR_HEALING_SPOT.row
+    ) {
       healPlayerFully();
       this.showHealNotice();
       return;
     }
 
-    this.maybeTalkToNpc(facedCol, facedRow);
+    const npcPlacements = this.zoneDef.zoneId === ZONE_ID ? STARTING_ZONE_NPCS : FIELD_OFFICE_INTERIOR_NPCS;
+    this.maybeTalkToNpc(facedCol, facedRow, npcPlacements);
   }
 
   /** NPC entity system (TODO.md "World & Exploration"): if `(col, row)` has
-   * a placed NPC (`STARTING_ZONE_NPCS`), pauses this scene and launches
+   * a placed NPC in `placements`, pauses this scene and launches
    * `DialogueScene` with that NPC's lines, matching the documented caller
    * convention in `DialogueScene.ts` (pause first, so the underlying
    * scene's own input bindings - e.g. this scene's Enter-opens-pause-menu -
    * don't also react to the same keypress). Resumes this scene, and
    * re-binds `touchControls.onA` back to `checkInteraction` (see the
    * `resume` listener in `create()`), once the dialogue box closes. Only
-   * ever called from `checkInteraction`, which already gates on
-   * `this.zoneDef.zoneId === ZONE_ID`. */
-  private maybeTalkToNpc(col: number, row: number): void {
-    const placement = STARTING_ZONE_NPCS.find((npc) => npc.col === col && npc.row === row);
+   * ever called from `checkInteraction`, which picks the right placement
+   * list for the current zone. */
+  private maybeTalkToNpc(col: number, row: number, placements: NpcPlacement[]): void {
+    const placement = placements.find((npc) => npc.col === col && npc.row === row);
     if (!placement) return;
     const npc = NPCS[placement.npcId];
 
