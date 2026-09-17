@@ -86,5 +86,5 @@ export const FIELD_OFFICE_INTERIOR_NPCS: NpcPlacement[] = buildNpcs();
  * back in - the same round-trip pattern `routeOneStub.ts#ZONE_EXITS` uses.
  */
 export const ZONE_EXITS: ZoneExit[] = [
-  { col: 3, row: MAP_ROWS - 1, targetZoneId: 'fernbrook_outpost', targetSpawn: { col: 19, row: 8 } },
+  { col: 3, row: MAP_ROWS - 1, targetZoneId: 'fernbrook_outpost', targetSpawn: { col: 21, row: 8 } },
 ];
