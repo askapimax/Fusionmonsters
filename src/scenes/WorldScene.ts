@@ -16,8 +16,11 @@ import { TRAINERS } from '../data/trainers';
 import { mulberry32, randomSeed } from '../genetics/rng';
 import { touchControls } from '../input/touchControls';
 import { getPlayerAppearance } from '../state/player';
+import { healPlayerFully } from '../state/party';
 import { concordRegistry } from '../state/registry';
+import { UI_THEME } from '../ui/panel';
 import {
+  HEALING_SPOT,
   MAP_COLS,
   MAP_ROWS,
   SPAWN,
@@ -57,6 +60,7 @@ export class WorldScene extends Phaser.Scene {
   private keyA!: Phaser.Input.Keyboard.Key;
   private keyS!: Phaser.Input.Keyboard.Key;
   private keyD!: Phaser.Input.Keyboard.Key;
+  private healNoticeText?: Phaser.GameObjects.Text;
 
   constructor() {
     super('WorldScene');
@@ -79,6 +83,7 @@ export class WorldScene extends Phaser.Scene {
   create(): void {
     this.buildGroundLayer();
     this.buildProps();
+    this.buildHealingSpot();
     this.createPlayerAnimations();
 
     this.player = this.add
@@ -116,6 +121,83 @@ export class WorldScene extends Phaser.Scene {
 
     touchControls.onStart = () => this.openMenu();
     this.input.keyboard!.on('keydown-ENTER', () => this.openMenu());
+
+    // Interact-with-facing-tile binding (e.g. the healing marker below).
+    // Z/on-screen-A match the convention menus already use for "confirm"
+    // (see PauseMenuScene/InventoryScene/BattleScene). `touchControls.onA`
+    // gets reclaimed by whichever menu/battle scene is on top while it's
+    // open, so it's re-bound here on every WorldScene resume too.
+    this.input.keyboard!.on('keydown-Z', () => this.checkInteraction());
+    touchControls.onA = () => this.checkInteraction();
+    this.events.on('resume', () => {
+      touchControls.onA = () => this.checkInteraction();
+    });
+  }
+
+  /** A small Graphics-drawn healing marker (no real pixel-art asset exists
+   * for this yet, matching the plain-shape approach `src/ui/panel.ts` uses
+   * for other object-less UI) placed just outside the field office's door -
+   * see `HEALING_SPOT` in startingZone.ts for why it's outdoors for now.
+   * Blocks its own tile so the player has to approach and face it, the
+   * same interaction shape planned for NPCs (see TODO.md). */
+  private buildHealingSpot(): void {
+    const x = this.tileCenterX(HEALING_SPOT.col);
+    const y = HEALING_SPOT.row * TILE_SIZE + TILE_SIZE / 2;
+    const radius = TILE_SIZE * 0.4;
+
+    const marker = this.add.graphics().setDepth(4);
+    marker.fillStyle(0x2a6f8f, 1);
+    marker.fillCircle(x, y, radius);
+    marker.lineStyle(2, UI_THEME.border, 1);
+    marker.strokeCircle(x, y, radius);
+    // A simple plus/cross "heal" icon inside the marker.
+    marker.fillStyle(UI_THEME.border, 1);
+    const armLength = radius * 1.1;
+    const armThickness = radius * 0.35;
+    marker.fillRect(x - armThickness / 2, y - armLength / 2, armThickness, armLength);
+    marker.fillRect(x - armLength / 2, y - armThickness / 2, armLength, armThickness);
+
+    this.blockedTiles.add(`${HEALING_SPOT.col},${HEALING_SPOT.row}`);
+  }
+
+  /** Faces the tile the player is currently facing and, if it's the healing
+   * marker, fully restores the active Fusion's HP (see `healPlayerFully`)
+   * with a brief on-screen confirmation. This stands in for a real "Fusion
+   * Center" NPC until the field office has an interior to put one in. */
+  private checkInteraction(): void {
+    if (this.scene.isPaused() || this.moving) return;
+
+    const { col: deltaCol, row: deltaRow } = DIRECTION_DELTA[this.facing];
+    const facedCol = this.gridCol + deltaCol;
+    const facedRow = this.gridRow + deltaRow;
+
+    if (facedCol === HEALING_SPOT.col && facedRow === HEALING_SPOT.row) {
+      healPlayerFully();
+      this.showHealNotice();
+    }
+  }
+
+  /** Rendered in world-space above the player (not `scrollFactor(0)` HUD
+   * text) so it scales and positions correctly under the 3x-zoomed world
+   * camera - a fixed-screen-space text here would be thrown off by the
+   * camera zoom the same way `WorldScene`'s top-left instructions text
+   * already is. */
+  private showHealNotice(): void {
+    this.healNoticeText?.destroy();
+    this.healNoticeText = this.add
+      .text(this.player.x, this.player.y - CHAR_FRAME_HEIGHT - 6, 'Fully healed!', {
+        fontSize: '8px',
+        color: UI_THEME.highlight,
+        fontFamily: UI_THEME.fontFamily,
+        backgroundColor: '#14141c',
+        padding: { x: 3, y: 2 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(50);
+    this.time.delayedCall(1600, () => {
+      this.healNoticeText?.destroy();
+      this.healNoticeText = undefined;
+    });
   }
 
   private openMenu(): void {
