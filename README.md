@@ -15,12 +15,14 @@ together, without needing to ask.
 Pre-alpha. The procedural monster catalogs (parts/types/moves/traits) and
 the breeding/genetics engine are implemented and tested (see
 [Procedural Graphics & Data Catalogs](#procedural-graphics--data-catalogs-implemented)
-below), and there's now a first playable zone with a walking placeholder
-character (see [The First Zone: Fernbrook Outpost](#the-first-zone-fernbrook-outpost-implemented)) -
-but no character creation, battling, capturing, or breeding UI yet, and no
-spawn/respawn implementation. See [TODO.md](TODO.md) for the current task
-breakdown. Design decisions below are the accepted direction for the game
-as of this writing, not aspirational/optional ideas.
+below), and there's now a first playable zone with a real character
+creation flow (see [The First Zone: Fernbrook Outpost](#the-first-zone-fernbrook-outpost-implemented))
+connected via a zone-transition mechanism to a placeholder second zone, a
+roster data layer, and both wild and trainer battles - but still no
+capturing or breeding UI, and no spawn/respawn implementation. See
+[TODO.md](TODO.md) for the current task breakdown. Design decisions below
+are the accepted direction for the game as of this writing, not
+aspirational/optional ideas.
 
 ## Elevator Pitch
 
@@ -85,10 +87,11 @@ gyms) runs in parallel with, and eventually converges on, that story.
 - Choose a name.
 - You start with a starter Fusion given to you at a Bastion at story start.
 
-Character creation itself (this screen) isn't built yet - see the next
-section: `WorldScene` currently spawns a default-appearance placeholder
-character directly into the world, so world/movement could be built and
-tuned first.
+Character creation itself is now real (`src/scenes/CharacterCreationScene.ts`,
+`src/state/player.ts`) - see the next section. Name entry has no effect
+beyond being stored yet (no NPC/UI references it), and since there's no
+second character spritesheet, appearance is a Phaser tint on the one
+shared sheet rather than genuinely different art (see next section).
 
 ## The First Zone: Fernbrook Outpost (implemented)
 
@@ -98,11 +101,12 @@ than just described here - see `src/world/startingZone.ts` and
 `src/scenes/WorldScene.ts`. This is what `npm run dev` currently boots into.
 
 - A hand-laid 40x30 tile map: grass, a dirt path, a small pond, three
-  tall-grass patches (future wild-encounter zones, not wired up yet), and
-  a small Concord field office the player starts right in front of, plus
-  scattered trees. There's no hard border - the map just runs out at its
-  edges, which is an honest reflection of there being no further zones yet
-  rather than a designed boundary.
+  tall-grass patches (wild-encounter zones, see "Spawns & Named Bosses"
+  below), and a small Concord field office the player starts right in
+  front of, plus scattered trees. The map's south gap now connects to a
+  second zone via the zone-transition system (see "World & Exploration"
+  in TODO.md) - currently just a tiny, explicitly-placeholder "Route 1"
+  stub proving the mechanism, not real level design yet.
 - Unlike the procedural Fusion parts, world art is **real pixel art**, not
   generated: `src/data/tiles.ts` (ground) and `src/data/props.ts` (trees,
   the field office - bigger multi-tile objects placed on top of the
@@ -112,9 +116,11 @@ than just described here - see `src/world/startingZone.ts` and
   file (mostly CC BY-SA 4.0) - this is a different license than this
   repo's own Apache-2.0 code, so keep that file's terms in mind before
   redistributing those specific assets.
-- The placeholder player character (`src/data/character.ts`) is likewise
-  a real 4-direction x 3-frame walk-cycle spritesheet (one default look,
-  no character-creation choices yet), also from Tuxemon.
+- The player character (`src/data/character.ts`) is likewise a real
+  4-direction x 3-frame walk-cycle spritesheet from Tuxemon - one actual
+  sheet, with the MALE/FEMALE choice from character creation applied as a
+  Phaser tint (`APPEARANCE_TINTS`) rather than a second sheet, since only
+  one exists (see "Player's role" above).
 - Movement is classic tile-grid stepping (one tile per key-tap or per
   ~160ms while a direction is held) with a real walk animation while
   moving, per-tile collision (water and prop footprints block movement;
@@ -197,10 +203,11 @@ rest of the UI, reachable by walking into tall grass (see
 [Spawns & Named Bosses](#spawns--named-bosses) below). What's real vs. still
 the design above:
 
-- One Fusion per side, not a party of 6 - the player is auto-assigned a
-  single random founder Fusion the first time a battle is needed
-  (`src/state/party.ts`), since starter selection/character creation
-  doesn't exist yet either. No switching, no roster.
+- One Fusion actively battles per side (`src/state/party.ts` now holds a
+  real up-to-6 roster, see "Party roster" under Progression below, but
+  there's no in-battle switching yet and no starter-selection flow, so the
+  player is still auto-assigned a random founder into the roster's first
+  slot the first time a battle is needed).
 - Damage uses type effectiveness, STAB, Physical (Attack/Defense) vs.
   Special (Focus/Resist) stats, and move accuracy, plus a working (if
   simplified) status layer: heals, +/-stat stages, burn/poison
@@ -210,8 +217,14 @@ the design above:
   camera shake, and an HP bar that visibly drains rather than jumping.
 - No capture yet - a battle only ends in a win, a loss (which fully heals
   the player and returns them to the field, since there's no
-  healing-item economy to make a loss otherwise survivable), or running
-  away (which always succeeds). No trainer battles, only wild ones. No
+  healing-item economy to make a loss otherwise survivable - though the
+  player can now also heal proactively via a standalone healing marker
+  outside Fernbrook's field office, see "Battling" below in TODO.md), or
+  running away (which always succeeds against a wild Fusion). Trainer
+  battles now exist too (`src/data/trainers.ts`,
+  `BattleScene`'s trainer mode) - no RUN AWAY option, trainer-flavored
+  messages - triggered by a temporary standalone world trigger rather
+  than real NPC interaction (that system doesn't exist yet). No
   leveling/XP - a Fusion's power is fixed by its genome, so winning grants
   no numeric reward beyond the win.
 
@@ -371,6 +384,10 @@ mutation bounds, dual-typing carrier behavior, registry de-duplication).
 
 ## Progression
 
+- **Party roster** — up to 6 Fusions (`src/state/party.ts`), implemented
+  as a data layer (add/remove/reorder/active-slot operations) ahead of any
+  UI or way to actually fill it beyond the auto-assigned starter - see
+  TODO.md's "Battling" section.
 - **Bastions** — regional Concord research stations, each with a signature
   Fusion specialist to defeat, functioning as this game's gym/badge
   equivalent and gating story progress.
