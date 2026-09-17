@@ -6,6 +6,7 @@ import { ConcordRegistryScene } from './scenes/ConcordRegistryScene';
 import { DialogueScene } from './scenes/DialogueScene';
 import { InventoryScene } from './scenes/InventoryScene';
 import { PauseMenuScene } from './scenes/PauseMenuScene';
+import { TitleScreenScene } from './scenes/TitleScreenScene';
 import { WorldScene } from './scenes/WorldScene';
 
 new Phaser.Game({
@@ -29,10 +30,11 @@ new Phaser.Game({
     width: 800,
     height: 480,
   },
-  // CharacterCreationScene is first so Phaser auto-starts it instead of
-  // WorldScene - it hands off to WorldScene itself (`this.scene.start
-  // ('WorldScene')`) once the player confirms their appearance/name.
-  scene: [CharacterCreationScene, WorldScene, PauseMenuScene, InventoryScene, ConcordRegistryScene, BattleScene, DialogueScene],
+  // TitleScreenScene is first so Phaser auto-starts it instead of
+  // WorldScene: NEW GAME starts CharacterCreationScene, which in turn
+  // hands off to WorldScene (`this.scene.start('WorldScene')`) once the
+  // player confirms their appearance/name.
+  scene: [TitleScreenScene, CharacterCreationScene, WorldScene, PauseMenuScene, InventoryScene, ConcordRegistryScene, BattleScene, DialogueScene],
 });
 
 attachTouchControls('touch-controls');
