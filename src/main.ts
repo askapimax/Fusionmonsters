@@ -7,6 +7,7 @@ import { ConcordRegistryScene } from './scenes/ConcordRegistryScene';
 import { DialogueScene } from './scenes/DialogueScene';
 import { InventoryScene } from './scenes/InventoryScene';
 import { PauseMenuScene } from './scenes/PauseMenuScene';
+import { StarterSelectionScene } from './scenes/StarterSelectionScene';
 import { StorageScene } from './scenes/StorageScene';
 import { TitleScreenScene } from './scenes/TitleScreenScene';
 import { WorldScene } from './scenes/WorldScene';
@@ -52,6 +53,7 @@ new Phaser.Game({
         CatalogPreviewScene,
         TitleScreenScene,
         CharacterCreationScene,
+        StarterSelectionScene,
         WorldScene,
         PauseMenuScene,
         InventoryScene,
@@ -63,6 +65,7 @@ new Phaser.Game({
     : [
         TitleScreenScene,
         CharacterCreationScene,
+        StarterSelectionScene,
         WorldScene,
         PauseMenuScene,
         InventoryScene,
