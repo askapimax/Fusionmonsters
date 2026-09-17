@@ -1,6 +1,7 @@
 import type { PropPlacement } from '../data/props';
 import type { ZoneId } from '../data/spawnTables';
 import type { TileId } from '../data/tiles';
+import type { TrainerId } from '../data/trainers';
 
 /**
  * The game's first zone: "Fernbrook Outpost", a small Concord waystation at
@@ -73,3 +74,29 @@ function buildProps(): PropPlacement[] {
 
 export const STARTING_ZONE_GROUND: TileId[][] = buildGround();
 export const STARTING_ZONE_PROPS: PropPlacement[] = buildProps();
+
+/**
+ * A trainer-battle trigger placed on the map (TODO.md "Battling" -
+ * Trainer-battle type). There's no real NPC-interaction system yet (a
+ * separate, not-yet-built TODO item), so this is a simple standalone
+ * stand-in: a single world tile that starts a trainer battle the first
+ * time the player steps onto it, deterministically (not a per-step random
+ * roll like wild-encounter tall grass) - see
+ * `WorldScene.maybeTriggerTrainerBattle`. Swap this for a real NPC-facing
+ * interaction once that system exists.
+ */
+export interface TrainerPlacement {
+  trainerId: TrainerId;
+  col: number;
+  row: number;
+}
+
+function buildTrainers(): TrainerPlacement[] {
+  return [
+    // Open grass well clear of the path, pond, tall-grass patches, and
+    // tree footprints above.
+    { trainerId: 'fernbrook_scout', col: 30, row: 24 },
+  ];
+}
+
+export const STARTING_ZONE_TRAINERS: TrainerPlacement[] = buildTrainers();
