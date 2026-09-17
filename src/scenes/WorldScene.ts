@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import {
+  APPEARANCE_TINTS,
   CHARACTER_SHEET_URL,
   CHARACTER_TEXTURE_KEY,
   CHAR_FRAME_HEIGHT,
@@ -13,6 +14,7 @@ import { TILES, TILE_IDS, TILE_SIZE, type TileId } from '../data/tiles';
 import { generateWildFusion, rollForEncounter } from '../data/wildEncounters';
 import { mulberry32, randomSeed } from '../genetics/rng';
 import { touchControls } from '../input/touchControls';
+import { getPlayerAppearance } from '../state/player';
 import { concordRegistry } from '../state/registry';
 import { MAP_COLS, MAP_ROWS, SPAWN, STARTING_ZONE_GROUND, STARTING_ZONE_PROPS, ZONE_ID, ZONE_NAME } from '../world/startingZone';
 
@@ -27,10 +29,9 @@ const DIRECTION_DELTA: Record<FacingDirection, { col: number; row: number }> = {
 };
 
 /**
- * The first playable zone. No character creation yet (name/appearance) -
- * this scene just drops a default player character into Fernbrook Outpost
- * and lets them walk around, so world graphics/tuning can be iterated on
- * before character creation gets built on top of it.
+ * The first playable zone. Spawns the player character (with the
+ * appearance chosen in `CharacterCreationScene`, see `src/state/player.ts`)
+ * into Fernbrook Outpost and lets them walk around.
  */
 export class WorldScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Sprite;
@@ -72,6 +73,12 @@ export class WorldScene extends Phaser.Scene {
       .sprite(this.tileCenterX(this.gridCol), this.tileFloorY(this.gridRow), CHARACTER_TEXTURE_KEY, FACING_FRAMES.down.idle)
       .setOrigin(0.5, 1)
       .setDepth(10);
+    // Cosmetic-only appearance choice from character creation - see
+    // src/data/character.ts for why a tint stands in for a second sprite.
+    const appearanceTint = APPEARANCE_TINTS[getPlayerAppearance()];
+    if (appearanceTint !== null) {
+      this.player.setTint(appearanceTint);
+    }
 
     const worldWidth = MAP_COLS * TILE_SIZE;
     const worldHeight = MAP_ROWS * TILE_SIZE;
