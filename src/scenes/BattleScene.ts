@@ -20,6 +20,7 @@ import { mulberry32, pickRandom, randomSeed, type RNG } from '../genetics/rng';
 import { buildCreatureSVG, svgToDataUrl } from '../render/compositeSprite';
 import { touchControls } from '../input/touchControls';
 import { addToRoster, getPlayerCurrentHp, getPlayerFusion, healPlayerFully, setPlayerCurrentHp } from '../state/party';
+import { depositToStorage } from '../state/storage';
 import type { TrainerDef } from '../data/trainers';
 import { ITEMS_BY_ID } from '../data/items';
 import { consumeItem, hasItem } from '../state/inventory';
@@ -490,13 +491,12 @@ export class BattleScene extends Phaser.Scene {
       if (added) {
         this.say([`Gotcha! ${this.wild.label} was added to your roster!`], () => this.endBattle());
       } else {
-        // Roster is already at MAX_ROSTER_SIZE (src/state/party.ts) - no
-        // Fusion-storage system exists yet to send an overflow catch to
-        // (see TODO.md's "Fusion storage" item), so rather than drop the
-        // catch silently or crash, report it and let the battle continue.
+        // Roster is already at MAX_ROSTER_SIZE (src/state/party.ts) - send
+        // the catch to the Fusion-storage box instead of dropping it.
+        depositToStorage(this.wild.fusion);
         this.say(
-          [`Gotcha! ${this.wild.label} was caught...`, 'But your roster is full - it could not be secured!'],
-          () => this.openMoveMenu(),
+          [`Gotcha! ${this.wild.label} was caught!`, 'Your roster is full, so it was sent to storage.'],
+          () => this.endBattle(),
         );
       }
     });
