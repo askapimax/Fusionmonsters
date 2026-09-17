@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ITEMS_BY_ID } from '../data/items';
+import { touchControls } from '../input/touchControls';
 import { playerInventory } from '../state/inventory';
 import { drawPanel, drawSlot, UI_THEME } from '../ui/panel';
 
@@ -67,6 +68,15 @@ export class InventoryScene extends Phaser.Scene {
 
     this.input.keyboard!.on('keydown-ESC', () => this.close());
     this.input.keyboard!.on('keydown-ENTER', () => this.close());
+    this.input.keyboard!.on('keydown-X', () => this.close());
+
+    // B backs out, matching the pause menu. No A binding or grid cursor yet
+    // (nothing to select/confirm with an empty catalog) - add both once
+    // src/data/items.ts has real entries to navigate between.
+    touchControls.onB = () => this.close();
+    this.events.once('shutdown', () => {
+      touchControls.onB = null;
+    });
   }
 
   private buildGrid(): void {

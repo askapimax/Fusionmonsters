@@ -70,9 +70,7 @@ reality.
 - [x] Game Boy-style Start button (`index.html`, next to the D-pad; also
       bound to Enter on keyboard) opening a pause menu
       (`src/scenes/PauseMenuScene.ts`): INVENTORY, SAVE (present but
-      intentionally inert - shows "Not available yet."), CLOSE. Options
-      are directly clickable/tappable, not D-pad-navigated, since there's
-      no A/B button yet (see To Do below).
+      intentionally inert - shows "Not available yet."), CLOSE.
 - [x] Inventory screen (`src/scenes/InventoryScene.ts`), Pokemon-bag-style
       empty item grid, plus the data it reads from
       (`src/data/items.ts` - empty item catalog, `src/state/inventory.ts` -
@@ -83,6 +81,20 @@ reality.
       SAVE's notice appears and auto-dismisses without closing the menu,
       opening/closing Inventory returns cleanly to gameplay, and movement
       still works afterward (menu doesn't leave input stuck).
+- [x] On-screen A/B buttons (`index.html`, `src/input/touchControls.ts`;
+      Z/X on keyboard) plus real D-pad-navigable menus: the pause menu
+      (`src/scenes/PauseMenuScene.ts`) now has a `>` cursor moved with
+      Up/Down (arrow keys or the D-pad, edge-triggered so one press moves
+      one slot), A/Enter confirms the highlighted option, B/Esc backs out
+      and closes the menu. Mouse/touch-on-the-label still works directly
+      too and keeps the keyboard cursor in sync (hovering a label selects
+      it). Inventory gained a B-button/X-key back action to match; it has
+      no grid cursor yet since there's nothing in it to select (tracked
+      below). Verified via headless browser: Up/Down moves the cursor
+      between all three options and wraps correctly, A confirms the
+      selected option, the real on-screen B button (dispatched pointer
+      events, not a synthetic tap) closes the menu, and movement still
+      works after every close path.
 
 ## To Do
 
@@ -133,13 +145,12 @@ reality.
       it currently just shows "Not available yet." and needs real
       save-state logic wired in.
 - [ ] Decide on and build the game's main menu / UI shell.
-- [ ] A/B action buttons to match the Start button already added, and
-      D-pad-navigable menus (currently pause menu / inventory options
-      are click/tap-only, which works but isn't full Game-Boy-style
-      input parity).
 - [ ] Actual items in `src/data/items.ts` and ways to obtain them - the
       inventory screen is built and correctly renders whatever's there,
-      but nothing populates it yet.
+      but nothing populates it yet. Once there are items, give the
+      inventory grid the same D-pad cursor + A/B handling the pause menu
+      has (`src/scenes/InventoryScene.ts` only has a B-button back action
+      so far - there's nothing to move a cursor between yet).
 
 ### Art & Audio
 - [x] Re-polished the procedural Fusion-part generator (`pixelArt.ts`):

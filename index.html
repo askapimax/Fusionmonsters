@@ -63,10 +63,44 @@
         height: 156px;
       }
 
-      /* Game Boy-style Start button: small dark pill, off to the side of
-         the D-pad rather than part of it. */
-      .start-btn-wrap {
+      /* Right-hand side of the control bar: A/B action buttons stacked
+         above the Start button, Game Boy-style (B on the left, A on the
+         right). */
+      .side-controls {
         grid-column: 3;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .action-btns {
+        display: flex;
+        gap: 10px;
+      }
+
+      .action-btn {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: #2a2a35;
+        color: #e8e8f0;
+        border: 2px solid #454555;
+        font-size: 16px;
+        font-weight: bold;
+        font-family: monospace;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .action-btn:active,
+      .action-btn.is-pressed {
+        background: #3f7f6b;
+        border-color: #5fa38c;
+      }
+
+      /* Game Boy-style Start button: small dark pill. */
+      .start-btn-wrap {
         justify-self: start;
       }
 
@@ -141,8 +175,14 @@
           <button class="dpad-btn dpad-right" data-dir="right" aria-label="Move right">&#9654;</button>
           <button class="dpad-btn dpad-down" data-dir="down" aria-label="Move down">&#9660;</button>
         </div>
-        <div class="start-btn-wrap">
-          <button id="start-btn" class="start-btn" aria-label="Open menu">START</button>
+        <div class="side-controls">
+          <div class="action-btns">
+            <button id="b-btn" class="action-btn" aria-label="B button (back/cancel)">B</button>
+            <button id="a-btn" class="action-btn" aria-label="A button (confirm)">A</button>
+          </div>
+          <div class="start-btn-wrap">
+            <button id="start-btn" class="start-btn" aria-label="Open menu">START</button>
+          </div>
         </div>
       </div>
     </div>

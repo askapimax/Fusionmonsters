@@ -10,6 +10,11 @@ class TouchControlsState {
   direction: FacingDirection | null = null;
   /** Set by whoever owns the pause menu (WorldScene); called once per Start press. */
   onStart: (() => void) | null = null;
+  /** Set by menu scenes while open; called once per D-pad press (edge-triggered, unlike `direction`) so a tap moves a menu cursor by exactly one slot. */
+  onDirectionPress: ((direction: FacingDirection) => void) | null = null;
+  /** Set by menu scenes while open: A = confirm, B = back/cancel. */
+  onA: (() => void) | null = null;
+  onB: (() => void) | null = null;
 }
 
 export const touchControls = new TouchControlsState();
@@ -25,6 +30,7 @@ export function attachTouchControls(rootId: string): void {
     const press = (event: Event): void => {
       event.preventDefault();
       touchControls.direction = direction;
+      touchControls.onDirectionPress?.(direction);
       button.classList.add('is-pressed');
     };
     const release = (event: Event): void => {
@@ -49,4 +55,22 @@ export function attachTouchControls(rootId: string): void {
   });
   startButton?.addEventListener('pointerup', () => startButton.classList.remove('is-pressed'));
   startButton?.addEventListener('pointerleave', () => startButton.classList.remove('is-pressed'));
+
+  const aButton = root.querySelector<HTMLButtonElement>('#a-btn');
+  aButton?.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    aButton.classList.add('is-pressed');
+    touchControls.onA?.();
+  });
+  aButton?.addEventListener('pointerup', () => aButton.classList.remove('is-pressed'));
+  aButton?.addEventListener('pointerleave', () => aButton.classList.remove('is-pressed'));
+
+  const bButton = root.querySelector<HTMLButtonElement>('#b-btn');
+  bButton?.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    bButton.classList.add('is-pressed');
+    touchControls.onB?.();
+  });
+  bButton?.addEventListener('pointerup', () => bButton.classList.remove('is-pressed'));
+  bButton?.addEventListener('pointerleave', () => bButton.classList.remove('is-pressed'));
 }
