@@ -1,5 +1,6 @@
 import { createFounderGenome } from '../genetics/breeding';
 import { createFusion, type Fusion } from '../genetics/fusion';
+import type { Genome } from '../genetics/genome';
 import { mulberry32, randomSeed } from '../genetics/rng';
 import { concordRegistry } from './registry';
 
@@ -194,6 +195,27 @@ export function getActiveSlotIndex(): number | null {
   }
   const index = roster.indexOf(activeSlot);
   return index === -1 ? null : index;
+}
+
+/**
+ * Save/load (see `src/state/save.ts`): replaces the roster wholesale with
+ * previously-saved slots, re-deriving each `Fusion` from its saved `genome`
+ * via `createFusion` (deterministic from `genome.visualSeed` - see
+ * `genetics/fusion.ts`) rather than persisting the whole `Fusion` object.
+ * Deliberately does **not** touch `concordRegistry` - the save/load module
+ * restores the registry from its own saved snapshot separately, and
+ * re-registering every roster member here would incorrectly bump
+ * `timesDiscovered` a second time for each of them.
+ */
+export function restoreRoster(
+  slots: ReadonlyArray<{ genome: Genome; currentHp: number }>,
+  activeIndex: number | null,
+): void {
+  roster.length = 0;
+  for (const slot of slots) {
+    roster.push({ fusion: createFusion(slot.genome), currentHp: slot.currentHp });
+  }
+  activeSlot = activeIndex !== null && activeIndex >= 0 && activeIndex < roster.length ? roster[activeIndex] : null;
 }
 
 /**

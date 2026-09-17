@@ -59,4 +59,15 @@ export class ConcordRegistry {
   get size(): number {
     return this.entries.size;
   }
+
+  /**
+   * Replaces the registry's contents wholesale with previously-saved entries
+   * (see `src/state/save.ts`), preserving each entry's exact
+   * `timesDiscovered`/`firstGenomeId` rather than re-deriving them by
+   * calling `register()` once per entry (which would reset
+   * `timesDiscovered` to 1 for everything). Used only by save/load restore.
+   */
+  restore(entries: ReadonlyArray<RegistryEntry>): void {
+    this.entries = new Map(entries.map((entry) => [entry.signature, { ...entry }]));
+  }
 }

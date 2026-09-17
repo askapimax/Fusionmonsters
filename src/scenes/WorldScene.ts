@@ -19,6 +19,7 @@ import { touchControls } from '../input/touchControls';
 import { healPlayerFully } from '../state/party';
 import { getPlayerAppearance } from '../state/player';
 import { concordRegistry } from '../state/registry';
+import { setWorldPosition } from '../state/worldPosition';
 import { UI_THEME } from '../ui/panel';
 import type { DialogueStartData } from './DialogueScene';
 import { HEALING_SPOT, STARTING_ZONE_NPCS, STARTING_ZONE_TRAINERS, ZONE_ID } from '../world/startingZone';
@@ -89,6 +90,10 @@ export class WorldScene extends Phaser.Scene {
     this.facing = 'down';
     this.moving = false;
     this.blockedTiles = new Set<string>();
+    // Save/load (TODO.md "Persistence & Platform"): publish the spawn
+    // position so a save taken before the player's first step still has
+    // something to restore - see `src/state/worldPosition.ts`.
+    setWorldPosition(this.zoneDef.zoneId, this.gridCol, this.gridRow);
   }
 
   preload(): void {
@@ -394,6 +399,9 @@ export class WorldScene extends Phaser.Scene {
     this.moving = true;
     this.gridCol = targetCol;
     this.gridRow = targetRow;
+    // Save/load: keep the published position current on every step - see
+    // `src/state/worldPosition.ts` / the `init()` call above.
+    setWorldPosition(this.zoneDef.zoneId, this.gridCol, this.gridRow);
     this.player.play(`walk-${direction}`);
     this.tweens.add({
       targets: this.player,

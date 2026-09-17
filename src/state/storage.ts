@@ -1,5 +1,6 @@
 import { createFounderGenome } from '../genetics/breeding';
 import { createFusion, type Fusion } from '../genetics/fusion';
+import type { Genome } from '../genetics/genome';
 import { mulberry32 } from '../genetics/rng';
 import { concordRegistry } from './registry';
 
@@ -94,6 +95,22 @@ function seedDemoStorage(): void {
   }
 }
 seedDemoStorage();
+
+/**
+ * Save/load (see `src/state/save.ts`): replaces storage's contents wholesale
+ * with previously-saved genomes, re-deriving each `Fusion` via `createFusion`
+ * (see `restoreRoster` in `party.ts` for why this doesn't persist whole
+ * `Fusion` objects). Fully replaces the demo-seeded content rather than
+ * merging with it - a loaded save should show exactly what was saved,
+ * nothing else. Does not touch `concordRegistry` - see `restoreRoster`'s
+ * doc comment for why.
+ */
+export function restoreStorage(genomes: ReadonlyArray<Genome>): void {
+  storage.length = 0;
+  for (const genome of genomes) {
+    storage.push(createFusion(genome));
+  }
+}
 
 /**
  * Test-only: resets storage to empty, so each test can start from a clean

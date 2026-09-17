@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { touchControls } from '../input/touchControls';
+import { hasSaveData, loadSaveBlob, restoreFromSaveBlob } from '../state/save';
 import { drawPanel, UI_THEME } from '../ui/panel';
 
 const PANEL_WIDTH = 360;
@@ -23,7 +24,10 @@ interface MenuOption {
 
 const OPTIONS: MenuOption[] = [
   { label: 'NEW GAME', enabled: true, action: (scene) => scene.startNewGame() },
-  { label: 'CONTINUE', enabled: false, action: () => {} },
+  // `enabled` is recomputed every `create()` from `hasSaveData()` (see
+  // below) - the `false` here is just the pre-boot default before that
+  // first check runs.
+  { label: 'CONTINUE', enabled: false, action: (scene) => scene.continueGame() },
 ];
 
 /**
@@ -37,14 +41,13 @@ const OPTIONS: MenuOption[] = [
  * `WorldScene` once the player confirms their appearance/name - the full
  * boot chain is Title -> CharacterCreation -> World.
  *
- * CONTINUE: there is no save/load system yet (a separate, not-yet-built
- * TODO item), so there is never a save to load. Per this task's own
- * wording ("only enabled/shown when one exists"), CONTINUE is kept
- * *present but disabled* rather than omitted entirely - dimmed, not
- * cursor-selectable-to-confirm (confirming it is a no-op), with a small
- * "No save data yet." hint - so the menu's final shape (both options
- * visible) doesn't need to change again once save/load lands; only the
- * `enabled` flag above and a real load call need to change then.
+ * CONTINUE: real now that save/load exists (`src/state/save.ts`) - `create()`
+ * checks `hasSaveData()` and sets `OPTIONS[1].enabled` accordingly every
+ * time this scene starts, so it's dimmed/inert with a "No save data yet."
+ * hint on a fresh boot and enabled once a save exists. Confirming it loads
+ * the blob (`loadSaveBlob`/`restoreFromSaveBlob`) and starts `WorldScene`
+ * directly at the saved zone/position, skipping `CharacterCreationScene`
+ * since a loaded save already has an appearance/name.
  */
 export class TitleScreenScene extends Phaser.Scene {
   private optionTexts: Phaser.GameObjects.Text[] = [];
@@ -56,6 +59,11 @@ export class TitleScreenScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Real save/load check (TODO.md "Persistence & Platform") - see class
+    // doc comment. Recomputed on every `create()` in case this scene is
+    // ever revisited after a save happened elsewhere this session.
+    OPTIONS[1].enabled = hasSaveData();
+
     drawPanel(this, PANEL_X, PANEL_Y, PANEL_WIDTH, PANEL_HEIGHT).setDepth(200);
 
     this.add
@@ -108,11 +116,16 @@ export class TitleScreenScene extends Phaser.Scene {
     });
 
     this.add
-      .text(PANEL_X + PANEL_WIDTH / 2, OPTION_START_Y + OPTIONS.length * OPTION_SPACING + 8, 'No save data yet.', {
-        fontSize: '10px',
-        color: UI_THEME.textDim,
-        fontFamily: UI_THEME.fontFamily,
-      })
+      .text(
+        PANEL_X + PANEL_WIDTH / 2,
+        OPTION_START_Y + OPTIONS.length * OPTION_SPACING + 8,
+        OPTIONS[1].enabled ? '' : 'No save data yet.',
+        {
+          fontSize: '10px',
+          color: UI_THEME.textDim,
+          fontFamily: UI_THEME.fontFamily,
+        },
+      )
       .setOrigin(0.5)
       .setDepth(201);
 
@@ -152,7 +165,11 @@ export class TitleScreenScene extends Phaser.Scene {
   }
 
   private confirmSelection(): void {
-    OPTIONS[this.selectedIndex].action(this);
+    const option = OPTIONS[this.selectedIndex];
+    // Disabled options (CONTINUE with no save yet) stay selectable for
+    // discoverability but do nothing on confirm - see class doc comment.
+    if (!option.enabled) return;
+    option.action(this);
   }
 
   private releaseTouchHandlers(): void {
@@ -162,5 +179,25 @@ export class TitleScreenScene extends Phaser.Scene {
 
   startNewGame(): void {
     this.scene.start('CharacterCreationScene');
+  }
+
+  /**
+   * Real load logic (TODO.md "Persistence & Platform"): loads the save
+   * blob, restores every state module it covers (`restoreFromSaveBlob`),
+   * and jumps straight into `WorldScene` at the saved zone/position -
+   * skipping `CharacterCreationScene`, since a loaded save already has an
+   * appearance/name. Defensive no-op if there's no valid save (shouldn't
+   * happen since CONTINUE is disabled without one, but `hasSaveData`/
+   * `loadSaveBlob` could theoretically disagree if `localStorage` changed
+   * between this scene's `create()` and the confirm keypress).
+   */
+  continueGame(): void {
+    const blob = loadSaveBlob();
+    if (!blob) return;
+    restoreFromSaveBlob(blob);
+    // `position` is only `null` in the defensive edge case documented on
+    // `SaveBlob` - WorldScene's own `init()` falls back to its zone's
+    // default spawn when no data (or no `spawn`) is passed.
+    this.scene.start('WorldScene', blob.position ? { zoneId: blob.position.zoneId, spawn: blob.position.spawn } : undefined);
   }
 }
