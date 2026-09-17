@@ -77,18 +77,12 @@ into).
       no real address-bar-driven vh/innerHeight gap to reproduce directly.
 - [x] Game Boy-style Start button (`index.html`, next to the D-pad; also
       bound to Enter on keyboard) opening a pause menu
-      (`src/scenes/PauseMenuScene.ts`): INVENTORY, SAVE (present but
-      intentionally inert - shows "Not available yet."), CLOSE.
+      (`src/scenes/PauseMenuScene.ts`): INVENTORY, REGISTRY, SAVE (present
+      but intentionally inert - shows "Not available yet."), CLOSE.
 - [x] Inventory screen (`src/scenes/InventoryScene.ts`), Pokemon-bag-style
-      empty item grid, plus the data it reads from
-      (`src/data/items.ts` - empty item catalog, `src/state/inventory.ts` -
-      empty player inventory) and a shared UI panel style
-      (`src/ui/panel.ts`) reused by both menu screens. Verified the full
-      flow via headless browser: open via Enter and via the Start button,
-      confirmed a second Enter press closes rather than double-opening,
-      SAVE's notice appears and auto-dismisses without closing the menu,
-      opening/closing Inventory returns cleanly to gameplay, and movement
-      still works afterward (menu doesn't leave input stuck).
+      item grid with a real starting catalog and a D-pad cursor - see
+      "Starter item catalog + inventory grid interaction" below (Persistence
+      & Platform) for details.
 - [x] On-screen A/B buttons (`index.html`, `src/input/touchControls.ts`;
       Z/X on keyboard) plus real D-pad-navigable menus: the pause menu
       (`src/scenes/PauseMenuScene.ts`) now has a `>` cursor moved with
@@ -96,10 +90,8 @@ into).
       one slot), A/Enter confirms the highlighted option, B/Esc backs out
       and closes the menu. Mouse/touch-on-the-label still works directly
       too and keeps the keyboard cursor in sync (hovering a label selects
-      it). Inventory gained a B-button/X-key back action to match; it has
-      no grid cursor yet since there's nothing in it to select (tracked
-      below). Verified via headless browser: Up/Down moves the cursor
-      between all three options and wraps correctly, A confirms the
+      it). Verified via headless browser: Up/Down moves the cursor
+      between all options and wraps correctly, A confirms the
       selected option, the real on-screen B button (dispatched pointer
       events, not a synthetic tap) closes the menu, and movement still
       works after every close path.
@@ -109,6 +101,18 @@ into).
       Fusion. Wired into `WorldScene.maybeTriggerEncounter`, called from
       the movement-tween's `onComplete` so it can never fire mid-step or
       while a menu/battle is already open.
+- [x] Per-zone spawn tables (`src/data/spawnTables.ts`, `ZONE_SPAWN_TABLES`):
+      each zone weights which primary types are common vs. rare there (same
+      weighted-random pattern the part catalog uses for `rarityWeight`),
+      passed through `generateWildFusion`'s `spawnTable` param into
+      `createFounderGenome`'s `forcedPrimaryType` option. Fernbrook
+      Outpost's table favors flora/aqua and makes thermal/mineral/photon
+      rare. Parts/traits/moves/stats are still fully random within
+      whichever type gets rolled - only the type is zone-biased so far, and
+      it's still one weighted-type-list per zone rather than real
+      type/part "species" presets. Vitest suite in `spawnTables.test.ts`
+      covers the weighting and the fallback to a fully random type when no
+      table is given.
 - [x] Turn-based battle scene/UI (`src/scenes/BattleScene.ts`), in the
       same dark-panel/monospace style as the rest of the UI: Pokemon-style
       layout (wild top-right on its own platform, player bottom-left,
@@ -118,8 +122,8 @@ into).
       reused directly). A 2-column move grid (up to 4 moves + RUN AWAY)
       replaces the message box once it's the player's turn; RUN AWAY
       always succeeds (no capture/party system yet to make failure
-      meaningful - see below). Simple tween-based "juice": an intro
-      fade-in, an attack lunge, a hit-flash + camera shake, and an
+      meaningful - see Battling below). Simple tween-based "juice": an
+      intro fade-in, an attack lunge, a hit-flash + camera shake, and an
       animated HP-bar drain.
 - [x] Damage formula using type effectiveness (`getTypeEffectiveness`),
       stats, and move power/accuracy, plus same-type-attack-bonus and a
@@ -146,61 +150,228 @@ into).
       to the `gh-pages` branch. Live at
       https://askapimax.github.io/Fusionmonsters/ once the one manual
       Settings → Pages step (see README "Playing it online") is done.
+- [x] Concord registry UI (`src/scenes/ConcordRegistryScene.ts`): browses
+      every distinct signature discovered so far, in the same dark-panel/
+      monospace style as `InventoryScene` (reuses `drawPanel`/`drawSlot`/
+      `UI_THEME`) - a scrollable list of rows (type(s), part names,
+      `timesDiscovered`), a running "N signatures discovered" count, and
+      the same empty-state message when nothing's been found yet. Opens
+      from a REGISTRY entry in the pause menu
+      (`src/scenes/PauseMenuScene.ts`). The registry is a real app-wide
+      singleton (`src/state/registry.ts`, `concordRegistry`, mirroring the
+      `party.ts`/`inventory.ts` singleton pattern) with two writers today:
+      `WorldScene.maybeTriggerEncounter` registers every wild sighting, and
+      `party.ts#getPlayerFusion` registers the player's own Fusion the
+      first time it's assigned - bred offspring don't register yet since
+      breeding UI doesn't exist (wire it in when that lands, see Breeding
+      UI & Progression below). `ConcordRegistry` itself
+      (`src/genetics/registry.ts`) is unchanged; `CatalogPreviewScene`
+      still uses its own separate throwaway instance for its debug demo.
+      Verified end to end via headless browser: walked into tall grass
+      until a wild encounter fired, ran away, opened the registry and
+      confirmed it showed "2 signatures discovered." No per-entry cursor/
+      drill-down or sorting/filtering yet (Up/Down only scrolls); state is
+      in-memory only until Save/load lands; currently registers on every
+      wild *sighting*, not on catch (see Capture flow below - worth
+      revisiting once that exists).
+- [x] Starter item catalog + inventory grid interaction: a small first-pass
+      item catalog (`src/data/items.ts`) - Verdant Salve and Concord
+      Stim-Canister (heal items, `healFraction` 0.3/0.6, same
+      fraction-of-max-HP unit `moveEffects.ts`'s `verdant_regrowth` heal
+      already uses), Neutralizing Draught (cures burn/poison/paralysis,
+      the same status ids the battle engine uses), and a Sample Kit
+      explicitly labeled as an inert placeholder for the not-yet-built
+      capture flow. `playerInventory` (`src/state/inventory.ts`) is seeded
+      with a small starting kit by default (given at the start rather than
+      via a shop/NPC, which don't exist yet), so the bag is genuinely
+      populated. `InventoryScene` has the same D-pad cursor + A/B handling
+      the pause menu has, adapted to a 2D grid: Up/Down/Left/Right move a
+      highlighted cursor (clamped, not wrapped, at the grid edges), A/Enter
+      shows the selected item's name + description in the panel (no
+      "use"/consume action wired up yet - see below). `src/data/items.test.ts`
+      covers catalog integrity and the starting kit. Verified end to end
+      via headless browser. Follow-ups: no way to actually *use*/consume an
+      item yet in battle or the overworld (apply heal/cure effects,
+      decrement quantity - separate future work); no acquisition system
+      beyond the fixed starting kit besides what NPCs/shops (see World &
+      Exploration below) will eventually provide; heal fractions (0.3/0.6)
+      are placeholder balance, not tuned against a real economy.
+- [x] Code-split the Phaser bundle: `vite.config.ts` routes Phaser into its
+      own `manualChunks` vendor chunk, separate from app code. App code
+      dropped from ~1.52MB to ~50KB and can now be redeployed/cached
+      independently of the Phaser vendor chunk. Config-only change - no
+      source files touched. The Phaser vendor chunk itself (~1.48MB) still
+      trips Vite's 500kB warning, inherent to the library. Follow-ups:
+      lazy-loading non-initial scenes (`PauseMenuScene`, `InventoryScene`,
+      `BattleScene`, `ConcordRegistryScene`) via dynamic `import()` in
+      `src/main.ts` is a further optimization, needs real `npm run dev` +
+      manual scene-launch verification before landing; `CatalogPreviewScene`
+      is fully built but not referenced anywhere in `src/main.ts` - dead
+      code from the bundle's perspective, worth wiring in behind a debug
+      flag or removing.
 
 ## To Do
 
 ### World & Exploration
-- [ ] Character creation scene: pick male/female appearance (cosmetic
-      only, per README) and enter a name, shown once before `WorldScene`
-      boots. Store the choice (e.g. a small `src/state/player.ts`) and use
-      it to pick which spritesheet `src/data/character.ts` hands to the
-      player object, instead of `WorldScene` always spawning the single
-      hardcoded default look.
-- [ ] Starter-Fusion selection flow: a small screen/scene (e.g. presented
-      at the field office) offering a handful of founder Fusions to pick
-      from at story start, writing the choice into the party system below
-      instead of `src/state/party.ts` auto-assigning a random founder the
-      first time a battle happens.
-- [ ] Zone-transition system: a data-driven way for a map to declare exit
-      tiles that load a different zone at a specific spawn tile/facing
-      (extends `src/world/startingZone.ts`'s map format and
-      `WorldScene`'s tile/collision loading to support more than one
-      map). This is the mechanism only - Fernbrook Outpost's south gap
-      currently leads nowhere because nothing consumes it yet.
-- [ ] A second zone (new hand-laid map using the tile/prop catalogs, plus
-      its own wild-encounter tall-grass patches) connected to Fernbrook
-      Outpost's south exit via the transition system above.
-- [ ] Dialogue box UI system: a reusable scrolling text-box component
-      (own scene or an overlay usable from `WorldScene`) in the existing
-      dark-panel/monospace style (`src/ui/panel.ts`), advancing one
-      message at a time on A/Enter/click - the same interaction pattern
-      `BattleScene`'s message box already uses, factored out so NPCs,
-      signs, and story beats can all reuse it instead of each rebuilding
-      message-queue logic.
-- [ ] NPC entity system: place static NPCs on a zone map (sprite + facing
-      direction + a line or two of dialogue), block their tile like a
-      prop, and let the player interact with one by facing it and
-      pressing A, triggering the dialogue box above.
-- [ ] Make the Concord field office enterable: an interior scene/room
-      (small hand-laid indoor map) that the field-office prop's door tile
-      transitions into/out of via the zone-transition system, with at
-      least one NPC inside using the interaction system above.
+- [x] Character creation scene (`src/scenes/CharacterCreationScene.ts`,
+      `src/state/player.ts`): boots before `WorldScene` (first in
+      `main.ts`'s `scene` array), lets the player pick MALE/FEMALE
+      appearance (Left/Right cursor, live tinted preview) and type a name
+      via a real DOM `<input>` overlaid on the canvas (Phaser DOM Element,
+      `dom.createContainer` enabled in `main.ts`), then confirms via
+      A/Enter/click and hands off to `WorldScene` with
+      `this.scene.start('WorldScene')`. No second character spritesheet
+      exists in `public/assets/` and the appearance choice is cosmetic-only
+      per README, so `src/data/character.ts`'s new `APPEARANCE_TINTS` gives
+      each choice a distinct Phaser tint on the one shared "adventurer"
+      sheet rather than fabricating art - `WorldScene` applies it when
+      creating the player sprite. Verified end to end via headless
+      browser. Follow-up: swap the tint stand-in for a real second
+      spritesheet once one is commissioned (see Art & Audio below).
+- [x] Starter-Fusion selection flow (`src/scenes/StarterSelectionScene.ts`):
+      now runs right after character creation, before `WorldScene`
+      (`CharacterCreationScene`'s final `this.scene.start(...)` retargeted
+      from `'WorldScene'` to `'StarterSelectionScene'` - the only change to
+      that file). Offers exactly 3 fixed founder candidates (`flora`,
+      `aero`, `mineral` - spaced 3 apart around the 9-type effectiveness
+      cycle in `src/data/types.ts` so none has a type advantage over the
+      others), each generated from its own hardcoded `mulberry32` seed via
+      `createFounderGenome(rng, { forcedPrimaryType })` + `createFusion`
+      (same designed-not-random pattern `src/data/trainers.ts` uses),
+      rendering each candidate's real composited sprite, type, stat
+      highlights, and a flavor blurb. Left/Right wrapping cursor,
+      A/Enter/Z or click confirms; picking one calls `addToRoster(chosen)`
+      (which registers it into `concordRegistry`) then starts `WorldScene`.
+      Verified end to end via headless browser. Follow-ups: no re-roll/
+      "are you sure" confirmation step; the 3 candidates are a fixed set,
+      not data-driven from a larger pool; `party.ts#getPlayerFusion`'s old
+      lazy-auto-assign-a-random-founder-on-first-use fallback is now
+      effectively dead code on the normal play path (every roster starts
+      with a real starter pick before `WorldScene` ever loads) but was
+      left in place rather than removed, since it's still reachable in
+      edge cases (e.g. a save file saved before this item existed, or a
+      future dev/debug route that skips starter selection) - revisit if
+      it's ever confirmed truly unreachable.
+- [x] Zone-transition system (`src/world/zoneTypes.ts`, `src/world/zones.ts`):
+      a `ZONE_EXITS: ZoneExit[]` export per zone map file (`{ col, row,
+      targetZoneId, targetSpawn }`) - stepping onto one restarts
+      `WorldScene` via `this.scene.restart({ zoneId, spawn })`, which
+      re-runs `init()`/`preload()`/`create()` cleanly for the new zone. A
+      `ZONES: Record<ZoneId, ZoneDef>` registry (`src/world/zones.ts`)
+      wraps each zone file's ground/props/spawn/exits into a common shape
+      so `WorldScene` doesn't hardcode a single map anymore - adding a
+      real new zone later needs no `WorldScene.ts` changes beyond
+      registering it here. `src/world/startingZone.ts`'s existing exports
+      are untouched (purely additive `ZONE_EXITS`). Includes a tiny,
+      explicitly-labeled placeholder second zone
+      (`src/world/routeOneStub.ts`, "Route 1 (Placeholder)") wired to
+      Fernbrook's south gap purely to prove the mechanism end to end -
+      **not** the real second-zone content (see below). Found and
+      mitigated a Phaser gotcha: `scene.restart()` reuses the same
+      `KeyboardPlugin` instance rather than recreating it, so a direction
+      key held through a transition could leave a stuck `isDown` artifact;
+      `this.input.keyboard!.resetKeys()` in `create()` clears it. Verified
+      bidirectionally via headless browser (Fernbrook → stub → Fernbrook,
+      landing at the correct spawn tiles each way) by reading the live
+      scene's `zoneDef`/`gridCol`/`gridRow` state directly, since single
+      held-key test presses can trigger more than one tile-move if held
+      longer than the move tween's duration. The healing marker and
+      trainer-battle trigger (below) are still Fernbrook-only content, not
+      part of the generic `ZoneDef` shape - gated on `zoneId === ZONE_ID`
+      rather than generalized; worth revisiting once a real second zone
+      wants either.
+- [ ] A second zone (**real** hand-laid map using the tile/prop catalogs,
+      plus its own wild-encounter tall-grass patches) connected to
+      Fernbrook Outpost's south exit - the placeholder stub zone above
+      proves the mechanism but is explicitly not this; follow
+      `startingZone.ts`/`routeOneStub.ts`'s export shape for the new zone
+      file and register it in `src/world/zones.ts`.
+- [x] Dialogue box UI system (`src/scenes/DialogueScene.ts`,
+      `src/ui/messageQueue.ts`): `this.scene.launch('DialogueScene', {
+      lines, onDone })` shows lines one at a time in a bottom-anchored
+      panel matching `BattleScene`'s message-box style (dark-panel/
+      monospace, blinking ▼, advances on Z/Enter/click), then stops itself
+      and calls `onDone` once exhausted (also emits a `dialogueDone` event
+      as a callback-free alternative). The queue-advance logic itself is
+      factored into `src/ui/messageQueue.ts` (Phaser-free, unit-tested).
+      Not wired into `WorldScene`/NPCs yet - that's the NPC entity system
+      below. Verified via headless browser, including confirming a live
+      function passed through `scene.launch`'s data works as documented.
+      Follow-up for whoever wires this in: pause the launching scene first
+      (as `PauseMenuScene`/`BattleScene` already do for their own
+      overlays) since `DialogueScene` doesn't pause anything itself and a
+      scene's own input bindings (e.g. `WorldScene`'s Enter-opens-menu)
+      would otherwise also react to the same keypress.
+- [x] NPC entity system (`src/data/npcs.ts`, `WorldScene.buildNpcs`/
+      `maybeTalkToNpc`): an `NpcDef` catalog (id, static facing direction,
+      an optional tint on the shared player spritesheet since there's no
+      NPC-specific art, dialogue lines) plus additive Fernbrook placement
+      data (`STARTING_ZONE_NPCS` in `src/world/startingZone.ts`, mirroring
+      `STARTING_ZONE_TRAINERS`'s catalog/placement split). `WorldScene`
+      renders each as a static tinted sprite, blocks its tile, and wires
+      talking to one into the existing `checkInteraction()` method
+      (already bound to Z/on-screen-A): facing an NPC and pressing
+      interact pauses `WorldScene` and launches `DialogueScene` with its
+      lines, resuming on close. One real NPC placed ("Field Tech Bram"
+      near the field office) to demonstrate it. Kept Fernbrook-only
+      (gated on `zoneDef.zoneId === ZONE_ID`), matching how the healing
+      marker/trainer trigger already scope themselves - NPCs aren't part
+      of the generic `ZoneDef` shape yet. Verified end to end via headless
+      browser. Follow-ups: migrating the healing-marker/trainer-battle
+      stand-ins onto this system is still separate work (unchanged, left
+      exactly as they were); no NPC movement/patrol/animation (fully
+      static); no branching/conditional dialogue (always replays the same
+      fixed lines).
+- [x] Made the Concord field office enterable (`src/world/fieldOfficeInterior.ts`):
+      a small hand-laid 7x6 interior room, reached via a new doorstep
+      `ZoneExit` in `startingZone.ts` (the open grass tile just south of
+      the field-office prop, `(19, 7)`) through the same generic
+      zone-transition mechanism `routeOneStub.ts` already proved out - no
+      new Phaser Scene class needed, just another `ZONES` registry entry.
+      A door tile back out (`(3, MAP_ROWS-1)`) returns to Fernbrook one
+      tile south of the doorstep. No dedicated indoor tileset exists yet
+      (see Art & Audio below), so the floor is an explicit placeholder
+      reusing the outdoor `path` tile, and there are no wall tiles - map
+      edges alone bound movement, same as Fernbrook itself. One NPC inside
+      ("Registrar Wren", `src/data/npcs.ts`) demonstrates the interaction
+      system works in a zone transitioned into, not just the starting one.
+      The outdoor healing marker (`HEALING_SPOT`) moved from
+      `startingZone.ts` into this file, relocated to the back of the room;
+      `WorldScene.buildHealingSpot`/`buildNpcs` were generalized to take
+      the spot/placements as parameters so the same methods serve both
+      Fernbrook and the interior. Verified end to end via headless browser
+      (walked in, healed, talked to the NPC, walked back out). Follow-up:
+      real indoor wall/floor art once an indoor tileset exists (tracked
+      under Art & Audio below).
 
 ### Spawns & Encounters
-- [ ] Per-zone spawn tables: a data structure (e.g. per zone, a weighted
-      list of founder "species" presets - type/part combinations) plugged
-      into `src/data/wildEncounters.ts` so an encounter tile picks from
-      its zone's table instead of `createFounderGenome` producing a fully
-      random Fusion every time.
-- [ ] Persistent wild-Fusion world entities: place specific wild Fusion
-      instances on a zone map with their own alive/defeated state
-      (rendered on the map, not just rolled on step-in), so there's
-      something concrete for a respawn timer to act on. Battling one
-      removes it from the map instead of the current fresh-Fusion-per-
-      encounter behavior.
-- [ ] Global 2-minute respawn timer for the persistent wild-Fusion
-      entities above: a defeated/caught one reappears exactly 2 minutes
-      later (flat, no per-species/zone tuning per README).
+- [x] Persistent wild-Fusion world entities + global 2-minute respawn timer
+      (`src/world/wildFusionState.ts`, `WorldScene.buildWildFusions`):
+      3 fixed placements in Fernbrook (`STARTING_ZONE_WILD_FUSIONS` in
+      `startingZone.ts`), each rendered as its own composited map sprite
+      (same on-demand-texture approach `BattleScene` uses for battle
+      sprites) rather than rolled fresh on step-in like tall-grass
+      encounters. Stepping onto a placement's tile starts a battle against
+      that specific placement's Fusion (generated once, kept stable across
+      respawns); winning or catching it removes the sprite and starts a
+      flat 2-minute (`WILD_RESPAWN_MS`) respawn timer, after which it
+      reappears - the same Fusion instance, not re-rolled. State lives in
+      `wildFusionState.ts` as module-level, wall-clock (`Date.now()`)
+      state keyed by placement id, deliberately *not* Phaser scene-instance
+      state or a `this.time.delayedCall` alone, since `scene.restart()`
+      (used by every zone transition) reuses the same scene object rather
+      than creating a new one but does re-run `create()` - wall-clock state
+      is what actually survives a zone transition and reschedules the
+      *remaining* delay correctly on return. `BattleScene`'s
+      `WildBattleStartData`/`TrainerBattleStartData` gained an optional
+      `onDefeatedOrCaptured` callback (fired only on a real win or
+      successful capture, never on a loss/run) that `WorldScene` uses to
+      mark a placement defeated and start its respawn clock. Verified end
+      to end via headless browser: walked onto a placement, confirmed "A
+      wild Fusion appeared!" with the placement's own Fusion. Follow-up:
+      the Named-boss system below can build directly on this same
+      alive/defeated + respawn-timer machinery, just with a longer,
+      per-boss-configurable delay instead of the flat 2 minutes.
 - [ ] Named-boss system (mechanism, not content): a way to hand-place a
       unique Fusion on a zone map that always drops guaranteed special
       loot on defeat and uses its own (longer than 2-minute, configurable
@@ -210,55 +381,178 @@ into).
       Outpost using the system above: pick its Fusion build, its
       guaranteed-loot table entry (rare part / guaranteed-dominant allele
       / unique cosmetic variant per README), and its respawn timer value.
-- [ ] Capture flow: a "sample kit" item usable from the battle move menu
-      (alongside/instead of a move), a catch-rate formula scaled by the
-      wild Fusion's remaining HP%, status condition, and the kit's
-      strength (`src/battle/battleEngine.ts` has the HP/status state this
-      needs), and on success add the caught Fusion to the player's roster
-      (see Party management below) instead of the battle only ever ending
-      in win/loss/run.
+- [x] Capture flow: `computeCatchChance`/`attemptCapture`
+      (`src/battle/battleEngine.ts`) - a pure, documented catch-rate curve
+      scaled by the wild Fusion's remaining HP fraction (lower HP = better
+      odds) and a flat bonus for any status condition, times the item's
+      `kitStrength` (placeholder constants, not tuned balance). The Sample
+      Kit item (`src/data/items.ts`) now has a real `{ kind: 'capture';
+      strength }` effect instead of its old inert placeholder.
+      `src/state/inventory.ts` gained `hasItem`/`consumeItem` helpers.
+      `BattleScene` shows a SAMPLE KIT move-menu option only in wild
+      encounters (never trainer battles - same conditional that already
+      excludes RUN AWAY there) and only when the player holds one; success
+      calls `addToRoster`, or (now that Fusion storage exists too, see
+      below) `depositToStorage` if the roster is full, so a catch is never
+      silently lost; failure ("It broke free!") gives the wild Fusion one
+      real turn through the same turn-resolution pipeline a move uses,
+      so spamming the kit isn't a strictly-safe alternative to attacking.
+      8 new Vitest cases cover the catch-rate curve (near-guaranteed
+      success/failure at the extremes, real probabilities at midpoints,
+      monotonicity, kit-strength scaling). Verified via headless browser:
+      SAMPLE KIT appears in wild encounters, is absent from trainer
+      battles, and a failed catch correctly gives the wild Fusion a real
+      turn before reopening the menu. Follow-ups: catch-rate constants and
+      the base kit's `strength: 1` are placeholder balance; a stronger/
+      weaker capture item is now easy to add (different `strength`, same
+      formula).
 
 ### Battling
-- [ ] Trainer-battle type: a data model for a trainer NPC (party of one+
-      Fusions) reusing the NPC interaction system to trigger a battle via
-      `BattleScene`, distinct from a wild encounter in that RUN AWAY isn't
-      offered (matching real trainer-battle conventions) and the intro/
-      outcome messages read as a trainer fight rather than "a wild Fusion
-      appeared."
-- [ ] Party roster data layer: extend `src/state/party.ts` from a single
-      auto-assigned Fusion to a real list of up to 6, with add (from
-      starter selection, capture, or hatching), remove/release, and
-      reorder operations that other systems (capture, breeding, starter
-      selection) can call.
-- [ ] In-battle switching: once the roster above holds more than one
-      Fusion, add a SWITCH option to `BattleScene`'s move menu and a
-      forced-switch prompt when the active Fusion faints instead of the
-      battle ending immediately in a loss.
-- [ ] A healing location or item (a "Fusion Center" equivalent - e.g. an
-      NPC/object in the field office that fully restores the active
-      Fusion's HP and clears status) so that losing a battle can
-      eventually stop being a free full-heal safety net once capture/
-      party stakes exist - `BattleScene.loseBattle` currently always
-      full-heals for exactly this reason.
+- [x] Trainer-battle type (`src/data/trainers.ts`): a `TrainerDef` data
+      model (name + party of 1+ Fusions, built deterministically via a
+      fixed `mulberry32` seed rather than `randomSeed()` so a designed
+      encounter is stable across loads) plus one example trainer, "Scout
+      Reyna". `BattleScene`'s launch data now accepts `{ trainer }`
+      alongside the existing `{ wildFusion }`: trainer mode omits RUN AWAY
+      from the move menu and swaps the intro/win/loss text for trainer-
+      flavored messages ("Scout Reyna wants to battle!" etc.) - the wild-
+      encounter path is unchanged when no trainer is passed, and only
+      `party[0]` ever battles (no multi-Fusion trainer switching yet).
+      Since the real NPC-interaction system doesn't exist yet (see World &
+      Exploration above), triggered via a simple standalone stand-in: a
+      one-time, deterministic step-on trigger
+      (`STARTING_ZONE_TRAINERS`/`WorldScene.maybeTriggerTrainerBattle`,
+      Fernbrook-only for now), unlike wild encounters' per-step random
+      roll. Swap this for real NPC-facing interaction once that system
+      lands. Verified via headless browser: wild encounters still show
+      "A wild Fusion appeared!" with RUN AWAY present; the trainer trigger
+      shows the trainer intro with no RUN AWAY.
+- [x] Party roster data layer (`src/state/party.ts`): a real roster of up
+      to `MAX_ROSTER_SIZE` (6) `{ fusion, currentHp }` slots plus an
+      active-slot pointer (tracked by object reference so it survives
+      reorders automatically). `getPlayerFusion`/`getPlayerCurrentHp`/
+      `setPlayerCurrentHp`/`healPlayerFully` keep their exact original
+      behavior (lazy auto-assign into an empty roster, same clamping/
+      full-heal semantics), now reinterpreted as "the active roster slot"
+      - `BattleScene.ts`/`WorldScene.ts` needed zero changes. New surface
+      for capture/breeding/starter-selection/switching to build on:
+      `addToRoster` (false at 6/6 - the hook for a future "release one?"
+      capture-overflow prompt), `removeFromRoster`, `reorderRoster`,
+      `getRoster`, `setActiveSlot`, `getActiveSlotIndex`. Every added
+      Fusion registers into `concordRegistry`, matching the existing lazy-
+      init path. 22 new Vitest cases in `src/state/party.test.ts` cover
+      the legacy API's exact prior behavior plus every new operation.
+      Design note for later: removing the active slot falls back to "new
+      slot 0" (simplest predictable rule, documented in code) rather than
+      "next"/"previous" - revisit if a release-from-party-screen UX wants
+      different active-slot feel.
+- [x] In-battle switching (`src/scenes/BattleScene.ts`,
+      `src/battle/partySwitching.ts`): a SWITCH move-menu option shown
+      whenever `getRoster().length > 1`, in both wild and trainer battles
+      (same generalized-index pattern `sampleKitIndex`/`runAwayIndex`
+      already use). Picking a voluntary switch costs the player's turn -
+      the opponent gets a real turn through the same `giveWildFreeTurn`
+      pipeline a failed Sample Kit already uses. When the active Fusion
+      faints, a forced switch prompt now runs instead of ending the battle
+      immediately (`checkOutcomeOrContinue`'s fainted branch calls the new
+      `handlePlayerFaint()` rather than `loseBattle()` directly), falling
+      through to the unchanged `loseBattle()` only when no viable switch
+      target remains; a forced switch doesn't cost an extra turn. A
+      per-battle `faintedSlots` set tracks which roster slots fainted this
+      battle (the roster's own stored HP for the active slot is stale
+      until written back). The viable-switch-target logic itself is a
+      pure, unit-tested helper (`viableSwitchIndices`,
+      `partySwitching.test.ts`, 8 cases) extracted out of
+      `BattleScene`/`party.ts`'s singleton state for testability. The
+      single-Fusion-roster path is byte-for-byte unchanged. Verified via
+      headless browser and the existing battle test suite.
+- [ ] Follow-up gap from in-battle switching above: a roster member that
+      faints mid-battle and is then switched away from keeps whatever HP
+      `party.ts` last had written for its slot until the battle's normal
+      end-of-battle writeback runs - if the battle ends by a path that
+      skips that writeback (e.g. RUN AWAY after a teammate already
+      fainted), that member could stay recorded at 0 HP outside the
+      healing location/`loseBattle`'s free heal. Not hit by today's
+      Vitest/headless-browser coverage; worth a dedicated regression test
+      once someone's touching this area again.
+- [x] A healing location (`HEALING_SPOT` in `src/world/startingZone.ts`,
+      `WorldScene.buildHealingSpot`/`checkInteraction`): a "Fusion Center"
+      stand-in placed just outside the field office's door, since the
+      field office isn't enterable yet (blocked on the zone-transition
+      system above - a deliberate outdoor scope-reduction, not the final
+      design). A small Graphics-drawn marker (no real pixel-art asset
+      exists for this, matching `src/ui/panel.ts`'s plain-shapes
+      convention) blocks its own tile so the player must approach and
+      face it; pressing Z/on-screen-A (the same "confirm" binding menus
+      already use) calls the existing `healPlayerFully()` and shows a
+      brief world-space "Fully healed!" popup. Status conditions need no
+      clearing here - verified they only ever live on a battle-scoped
+      `BattleCombatant`, never persisted outside a battle. Fernbrook-only
+      for now (gated alongside the trainer trigger, see the zone-
+      transition entry above). Verified via headless browser, including
+      driving the player's real HP down and confirming the marker
+      restores it via the same `healPlayerFully()` path
+      `BattleScene.loseBattle`'s free heal already uses.
+      `BattleScene.loseBattle` still always full-heals regardless - this
+      item was about giving the player another way to heal, not about
+      removing that safety net, which stays deliberate until capture/
+      party stakes exist (see Capture flow above).
+- [x] Fixed: `WorldScene`'s top-left HUD text (zone name / controls hint)
+      was invisible - `setScrollFactor(0)` cancels camera scroll but not
+      zoom, and Phaser anchors zoom on the camera's *center*, not its
+      top-left corner, so the fixed-position text at `(8, 8)` was
+      rendering 3x too large and displaced off-canvas rather than merely
+      "too far from the origin". Fixed by inverting that center-anchored
+      transform (a small `hudPoint()` helper in `create()`) plus
+      `.setScale(1 / cameraZoom)` to cancel the zoom back out of the
+      rendered size - kept scoped to the `create()` block (a second
+      unzoomed UI camera was considered but would've needed broader
+      composition changes across `scene.restart()`). Verified visually:
+      before, the text was absent from the rendered canvas; after, "Zone
+      name / controls hint" renders legibly in the top-left and stays
+      screen-fixed correctly during normal camera-follow movement.
 
 ### Breeding UI & Progression
-- [ ] Fusion storage ("box") system: a place to keep Fusions beyond the
-      6-slot active roster (caught/bred Fusions exceeding party capacity
-      need somewhere to go), plus a simple browse/withdraw/deposit screen
-      in the existing panel UI style.
-- [ ] In-game breeding UI: a screen to pick two compatible Fusions (same
-      breeding group, per README) from the roster/storage above and
-      produce an egg by calling the existing `breed()` engine
-      (`src/genetics/breeding.ts`) - the engine itself is done and
-      tested, only the picking-two-parents UI and egg creation are
-      missing.
+- [x] Fusion storage ("box") system (`src/state/storage.ts`,
+      `src/scenes/StorageScene.ts`): an uncapped overflow list of Fusions
+      (mirroring `party.ts`'s singleton style - `depositToStorage`,
+      `withdrawFromStorage`, `getStorage`), no "active slot"/live-HP
+      concept since stored Fusions are never mid-battle (a withdrawn one
+      gets full HP the same way any `addToRoster` addition does). A new
+      STORAGE entry in the pause menu opens a browse screen (same
+      `InventoryScene`-style D-pad grid cursor) that withdraws a selected
+      Fusion into the active roster if there's room, or explains why not
+      without losing it either way. Seeded with two deterministic demo
+      Fusions so it's demonstrable before any real caller exists; the
+      capture flow above now calls `depositToStorage` when the roster is
+      full instead of dropping the catch. 11 new Vitest cases. Verified
+      end to end via headless browser (browsed the seeded box, withdrew a
+      Fusion into the roster, closed cleanly). Follow-ups: no "move roster
+      member to storage" (deposit direction) flow yet; no sorting/
+      filtering/scrolling once storage genuinely grows past one 18-slot
+      grid (fine at today's scale - 2 demo items).
+- [x] In-game breeding UI (`src/scenes/BreedingScene.ts`): a two-parent
+      picker over the combined roster+storage pool (same D-pad grid
+      cursor `StorageScene`/`InventoryScene` use), locking in Parent A
+      then Parent B (rejects picking the same Fusion twice). Confirming
+      calls `breed(parentA.genome, parentB.genome, freshRng, {})` +
+      `createFusion()`, **registers the offspring into `concordRegistry`**
+      per this item's own instruction, then `addToRoster` (falling back to
+      `depositToStorage` if the roster is full - the exact same pattern
+      `BattleScene.attemptSampleKit`'s capture flow uses so a bred Fusion
+      is never silently lost). New BREED entry in the pause menu
+      (`PauseMenuScene.ts`). Deliberately produces an already-hatched
+      Fusion, not an egg - scope-cut from the full item on purpose, and
+      the UI copy says "was born"/"added to your roster/storage", never
+      "an egg was laid", to stay honest about that cut (see the Egg/
+      hatching flow item below, now unblocked). No breeding-group/
+      compatibility gating - `breed()` itself has none today, so any two
+      Fusions can be paired; revisit if breeding groups (per README) are
+      ever actually modeled. Verified end to end via headless browser.
 - [ ] Egg/hatching flow: an egg item/entity holding a bred genome, a
       hatch timer (steps walked or real time), and conversion into a
       real `Fusion` added to the roster/storage on hatch, with at least a
       simple on-screen notification when it happens.
-- [ ] Concord registry UI: a browse screen over `ConcordRegistry`
-      (`src/genetics/registry.ts`) listing discovered signatures and
-      their discovery counts, in the existing panel UI style.
 - [ ] First Bastion: a zone location with a signature-Fusion-specialist
       trainer battle (using the trainer-battle system above) that sets a
       story-progress flag on defeat, gating whatever content comes next.
@@ -269,22 +563,42 @@ into).
       on tasks of the same shape once this one exists.
 
 ### Persistence & Platform
-- [ ] Save/load via `localStorage`: serialize the player's position/zone,
-      appearance/name, roster + storage, inventory, registry, and story
-      flags into one save blob, wire real logic into the pause menu's
-      existing SAVE entry (`src/scenes/PauseMenuScene.ts`, currently
-      "Not available yet."), and load it back on boot when present.
-- [ ] Title screen / main menu scene shown before `WorldScene` boots:
-      New Game (starts character creation) and Continue (loads the save
-      above, only enabled/shown when one exists).
-- [ ] Starter item catalog: populate `src/data/items.ts` with a first
-      real batch of items (sample kits for the capture flow, a basic
-      healing item) and at least one way to obtain them in the world
-      (e.g. given at the field office, or a small shop/NPC).
-- [ ] Inventory grid interaction: once the catalog above is non-empty,
-      give `src/scenes/InventoryScene.ts` a D-pad-navigable cursor over
-      filled slots plus an A-button "use" action, matching the cursor
-      pattern `PauseMenuScene` already implements.
+- [x] Save/load via `localStorage` (`src/state/save.ts`): serializes the
+      player's position (`src/state/worldPosition.ts`, a small module-level
+      store `WorldScene` writes to on spawn and every completed move),
+      appearance/name, roster + storage (only each member's `genome` is
+      stored, not the full `Fusion` - `createFusion(genome)` deterministically
+      re-derives the phenotype on load), active-slot index, inventory, and
+      the Concord registry into one versioned `SaveBlob` under the
+      `'fusionmonsters-save'` key. Wired into the pause menu's SAVE entry
+      (`PauseMenuScene.showSaveNotice`, replacing the old inert "Not
+      available yet." placeholder) and into `TitleScreenScene`'s CONTINUE
+      option, whose `enabled` flag is now computed from `hasSaveData()`
+      instead of being permanently disabled - confirming CONTINUE restores
+      the saved roster/storage/registry/inventory and starts `WorldScene`
+      directly at the saved position, skipping character creation and
+      starter selection. `party.ts`/`storage.ts`/`registry.ts` each gained
+      a `restore*` function that rebuilds their singleton state from a
+      save blob without re-registering into `concordRegistry` a second
+      time (registry state is restored separately, verbatim). Story flags
+      are not yet part of the game (no story-flag system exists today), so
+      `SaveBlob.storyFlags` is present but always empty - wire real flags
+      in once the First Bastion/Chimera Nine story items below exist.
+      Verified end to end via headless browser: saved, reloaded the page,
+      CONTINUE restored the exact same state. Follow-up: no save-version
+      migration path yet if `SaveBlob`'s shape ever changes (`version: 1`
+      is a placeholder for that, not enforced anywhere yet).
+- [x] Title screen (`src/scenes/TitleScreenScene.ts`): now the actual boot
+      scene, ahead of `CharacterCreationScene`, in the same dark-panel/
+      monospace cursor-list style as `PauseMenuScene`. NEW GAME starts
+      `CharacterCreationScene` (which still hands off to `WorldScene` as
+      before). CONTINUE has nothing to load since save/load doesn't exist
+      yet (see above) - kept present-but-disabled (dimmed, no-op, "No save
+      data yet." hint) rather than omitted, so only an `enabled`
+      flag/real load call needs to change once save/load lands, not the
+      menu's shape. Verified via headless browser: title boots first, NEW
+      GAME → character creation → world all work, CONTINUE is correctly
+      inert.
 
 ### Art & Audio
 - [ ] Resolve the Tuxemon asset situation before shipping: either write
@@ -306,5 +620,22 @@ into).
       repo's Settings → Pages, set Source to "Deploy from a branch" /
       `gh-pages` / root - only after the workflow has run at least once
       (it creates the branch).
-- [ ] Code-split the Phaser bundle (currently a single ~1.5MB chunk per
-      `npm run build`; fine for now, revisit before shipping).
+- [ ] Lazy-load non-initial scenes (`PauseMenuScene`, `InventoryScene`,
+      `BattleScene`, `ConcordRegistryScene`) via dynamic `import()` in
+      `src/main.ts` - the app chunk still bundles all scenes eagerly even
+      though only `WorldScene` is needed at boot (see the code-split entry
+      above). Needs real `npm run dev` + manual scene-launch verification
+      before landing, not just a code read.
+- [x] Wired `src/scenes/CatalogPreviewScene.ts` in behind a
+      `?debug=catalog-preview` URL flag (chosen over removing it - it's a
+      genuinely useful, fast end-to-end check of the catalog → genome →
+      breeding → phenotype → composited-texture pipeline, and the project
+      had no debug routes yet to weigh against). Without the flag, boot
+      behavior is byte-for-byte the same as before (`TitleScreenScene`
+      still auto-starts); with it, `CatalogPreviewScene` takes that first
+      slot instead so Phaser auto-starts it in place of (not alongside)
+      the normal flow - an earlier attempt that called `scene.start()`
+      after game creation instead left the previous boot scene's DOM
+      overlay running underneath it. App chunk grows ~3.2KB/~1KB gzip.
+      Verified via headless browser: normal boot unaffected, the debug
+      route renders the breeding-preview visuals correctly.

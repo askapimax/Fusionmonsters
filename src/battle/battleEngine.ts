@@ -18,6 +18,32 @@ const DAMAGE_DIVISOR = 8;
 const END_OF_TURN_STATUS_DAMAGE_FRACTION = 1 / 8;
 const PARALYSIS_SKIP_CHANCE = 0.25;
 
+/**
+ * Catch-rate curve for the capture flow (TODO.md "Spawns & Encounters" -
+ * Capture flow), modeled on the genre-standard weaken-then-throw loop this
+ * game's README explicitly calls out: chance improves as the wild Fusion's
+ * remaining HP drops, and a status condition (burn/poison/paralysis) adds a
+ * flat bonus on top, matching how status effects traditionally help
+ * catches. `kitStrength` is a plain multiplier on top of that curve (1.0 for
+ * the baseline Sample Kit, see `src/data/items.ts`), so a future weaker/
+ * stronger kit item can reuse this exact formula rather than needing a
+ * redesign - it never needs its own HP/status logic.
+ *
+ * At kitStrength 1.0:
+ *  - Full HP, no status:  CATCH_FLOOR alone            = 5%
+ *  - Full HP, statused:   CATCH_FLOOR + STATUS_BONUS    = 25%
+ *  - Half HP, no status:  CATCH_FLOOR + 0.5*HP_WEIGHT    = 40%
+ *  - Near 0 HP, statused: CATCH_FLOOR + ~HP_WEIGHT + STATUS_BONUS, clamped
+ *                          to CATCH_CEILING              ~= 94%, capped at 98%
+ *
+ * Placeholder balance, not final tuning - same spirit as `DAMAGE_DIVISOR`
+ * above.
+ */
+const CATCH_FLOOR = 0.05;
+const CATCH_HP_WEIGHT = 0.7;
+const CATCH_STATUS_BONUS = 0.2;
+const CATCH_CEILING = 0.98;
+
 export type StageStat = 'attack' | 'defense' | 'focus' | 'resist' | 'speed';
 export type StatusCondition = 'burn' | 'poison' | 'paralysis' | null;
 
@@ -164,6 +190,25 @@ export function tickStatusDamage(combatant: BattleCombatant): StatusTickResult {
 
 export function applyDamage(target: BattleCombatant, damage: number): void {
   target.currentHp = Math.max(0, target.currentHp - damage);
+}
+
+/**
+ * Returns the 0-1 probability that a sample-kit capture attempt against
+ * `wild` succeeds, given a kit of the given `kitStrength` (see the curve
+ * comment above `CATCH_FLOOR`). Pure and side-effect-free so it's directly
+ * testable and reusable outside `BattleScene` - `attemptCapture` below is
+ * the thin RNG-rolling wrapper battle code should actually call.
+ */
+export function computeCatchChance(wild: BattleCombatant, kitStrength: number): number {
+  const hpFraction = wild.maxHp > 0 ? Math.max(0, Math.min(1, wild.currentHp / wild.maxHp)) : 0;
+  const statusBonus = wild.status !== null ? CATCH_STATUS_BONUS : 0;
+  const raw = (CATCH_FLOOR + (1 - hpFraction) * CATCH_HP_WEIGHT + statusBonus) * kitStrength;
+  return Math.max(0, Math.min(CATCH_CEILING, raw));
+}
+
+/** Rolls a single capture attempt against `computeCatchChance`'s probability. */
+export function attemptCapture(wild: BattleCombatant, kitStrength: number, rng: RNG): boolean {
+  return rng() < computeCatchChance(wild, kitStrength);
 }
 
 /** Higher effective Speed acts first; ties broken randomly rather than

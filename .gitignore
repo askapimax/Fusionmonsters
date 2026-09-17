@@ -52,3 +52,6 @@ coverage/
 # Misc caches
 .cache/
 .eslintcache
+
+# Claude Code agent worktrees (local session state, not project content)
+.claude/worktrees/
