@@ -13,6 +13,7 @@ import { TILES, TILE_IDS, TILE_SIZE, type TileId } from '../data/tiles';
 import { generateWildFusion, rollForEncounter } from '../data/wildEncounters';
 import { mulberry32, randomSeed } from '../genetics/rng';
 import { touchControls } from '../input/touchControls';
+import { concordRegistry } from '../state/registry';
 import { MAP_COLS, MAP_ROWS, SPAWN, STARTING_ZONE_GROUND, STARTING_ZONE_PROPS, ZONE_ID, ZONE_NAME } from '../world/startingZone';
 
 const MOVE_DURATION = 160;
@@ -198,6 +199,7 @@ export class WorldScene extends Phaser.Scene {
     if (!rollForEncounter(mulberry32(randomSeed()))) return;
 
     const wildFusion = generateWildFusion(mulberry32(randomSeed()), ZONE_SPAWN_TABLES[ZONE_ID]);
+    concordRegistry.register(wildFusion.genome, wildFusion.phenotype);
     this.scene.pause();
     this.scene.launch('BattleScene', { wildFusion });
   }
