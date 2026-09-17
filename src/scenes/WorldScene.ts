@@ -12,11 +12,21 @@ import { PROPS, type PropId } from '../data/props';
 import { ZONE_SPAWN_TABLES } from '../data/spawnTables';
 import { TILES, TILE_IDS, TILE_SIZE, type TileId } from '../data/tiles';
 import { generateWildFusion, rollForEncounter } from '../data/wildEncounters';
+import { TRAINERS } from '../data/trainers';
 import { mulberry32, randomSeed } from '../genetics/rng';
 import { touchControls } from '../input/touchControls';
 import { getPlayerAppearance } from '../state/player';
 import { concordRegistry } from '../state/registry';
-import { MAP_COLS, MAP_ROWS, SPAWN, STARTING_ZONE_GROUND, STARTING_ZONE_PROPS, ZONE_ID, ZONE_NAME } from '../world/startingZone';
+import {
+  MAP_COLS,
+  MAP_ROWS,
+  SPAWN,
+  STARTING_ZONE_GROUND,
+  STARTING_ZONE_PROPS,
+  STARTING_ZONE_TRAINERS,
+  ZONE_ID,
+  ZONE_NAME,
+} from '../world/startingZone';
 
 const MOVE_DURATION = 160;
 const WALK_ANIM_FRAME_RATE = 8;
@@ -40,6 +50,8 @@ export class WorldScene extends Phaser.Scene {
   private gridRow = SPAWN.row;
   private moving = false;
   private blockedTiles = new Set<string>();
+  /** Trainer-battle placements (`STARTING_ZONE_TRAINERS`) already triggered this session - a one-time deterministic trigger, unlike wild encounters which re-roll every step. */
+  private triggeredTrainerBattles = new Set<string>();
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyW!: Phaser.Input.Keyboard.Key;
   private keyA!: Phaser.Input.Keyboard.Key;
@@ -192,6 +204,7 @@ export class WorldScene extends Phaser.Scene {
         this.player.anims.stop();
         this.player.setFrame(FACING_FRAMES[this.facing].idle);
         this.maybeTriggerEncounter(targetCol, targetRow);
+        this.maybeTriggerTrainerBattle(targetCol, targetRow);
       },
     });
   }
@@ -209,6 +222,25 @@ export class WorldScene extends Phaser.Scene {
     concordRegistry.register(wildFusion.genome, wildFusion.phenotype);
     this.scene.pause();
     this.scene.launch('BattleScene', { wildFusion });
+  }
+
+  /** Trainer-battle trigger (TODO.md "Battling" - Trainer-battle type): stepping onto a
+   * `STARTING_ZONE_TRAINERS` tile starts a trainer battle exactly once, deterministically
+   * (no random roll, unlike `maybeTriggerEncounter`), via `BattleScene`'s trainer mode.
+   * A standalone stand-in for the not-yet-built NPC-interaction system - see
+   * src/world/startingZone.ts and src/data/trainers.ts. */
+  private maybeTriggerTrainerBattle(col: number, row: number): void {
+    if (this.scene.isActive('BattleScene')) return;
+    const placement = STARTING_ZONE_TRAINERS.find((t) => t.col === col && t.row === row);
+    if (!placement) return;
+    const key = `${placement.col},${placement.row}`;
+    if (this.triggeredTrainerBattles.has(key)) return;
+    this.triggeredTrainerBattles.add(key);
+
+    const trainer = TRAINERS[placement.trainerId];
+    concordRegistry.register(trainer.party[0].genome, trainer.party[0].phenotype);
+    this.scene.pause();
+    this.scene.launch('BattleScene', { trainer });
   }
 
   private getInputDirection(): FacingDirection | null {

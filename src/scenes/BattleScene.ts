@@ -19,11 +19,30 @@ import { mulberry32, pickRandom, randomSeed, type RNG } from '../genetics/rng';
 import { buildCreatureSVG, svgToDataUrl } from '../render/compositeSprite';
 import { touchControls } from '../input/touchControls';
 import { getPlayerCurrentHp, getPlayerFusion, healPlayerFully, setPlayerCurrentHp } from '../state/party';
+import type { TrainerDef } from '../data/trainers';
 import { drawPanel, UI_THEME } from '../ui/panel';
 
-export interface BattleStartData {
+/**
+ * Launch data for BattleScene. Exactly one of `wildFusion`/`trainer` is
+ * given:
+ *  - `wildFusion`: the existing wild-encounter path (unchanged) - RUN AWAY
+ *    is offered, and messages read "A wild Fusion appeared!".
+ *  - `trainer`: trainer-battle mode (TODO.md "Battling" - Trainer-battle
+ *    type) - no RUN AWAY (matching real trainer-battle conventions), and
+ *    intro/outcome messages read as a trainer fight. Only `trainer.party[0]`
+ *    is battled - multi-Fusion party switching is out of scope for now.
+ */
+export interface WildBattleStartData {
   wildFusion: Fusion;
+  trainer?: undefined;
 }
+
+export interface TrainerBattleStartData {
+  trainer: TrainerDef;
+  wildFusion?: undefined;
+}
+
+export type BattleStartData = WildBattleStartData | TrainerBattleStartData;
 
 type BattlePhase = 'message' | 'menu' | 'busy';
 
@@ -63,6 +82,8 @@ function combatantLabel(fusion: Fusion, isPlayer: boolean): string {
  */
 export class BattleScene extends Phaser.Scene {
   private wildFusionInput!: Fusion;
+  /** Non-null in trainer-battle mode; null for the ordinary wild-encounter path. */
+  private trainerInput: TrainerDef | null = null;
   private rng: RNG = mulberry32(randomSeed());
 
   private player!: BattleCombatant;
@@ -89,13 +110,18 @@ export class BattleScene extends Phaser.Scene {
   }
 
   init(data: BattleStartData): void {
-    this.wildFusionInput = data.wildFusion;
+    this.trainerInput = data.trainer ?? null;
+    // In trainer mode the opponent's combatant is the trainer's first (and,
+    // for now, only-battled) Fusion; everything downstream keeps treating
+    // it as "the wild side" so the existing wild-encounter path is
+    // untouched when trainerInput is null.
+    this.wildFusionInput = this.trainerInput ? this.trainerInput.party[0] : (data.wildFusion as Fusion);
   }
 
   create(): void {
     this.rng = mulberry32(randomSeed());
     this.player = createCombatant(getPlayerFusion(), combatantLabel(getPlayerFusion(), true), getPlayerCurrentHp());
-    this.wild = createCombatant(this.wildFusionInput, combatantLabel(this.wildFusionInput, false));
+    this.wild = createCombatant(this.wildFusionInput, this.opponentLabel());
 
     this.buildBackground();
     this.buildHud();
@@ -106,12 +132,31 @@ export class BattleScene extends Phaser.Scene {
     // ensureFusionTexture below), so the intro message - and everything
     // that follows it - only starts once both are actually on screen.
     this.buildCombatantSprites(() => {
-      this.say([`A wild Fusion appeared!`, `It's a ${TYPES[this.wild.fusion.phenotype.primaryType].name} type!`], () =>
-        this.openMoveMenu(),
-      );
+      this.say(this.introLines(), () => this.openMoveMenu());
     });
 
     this.events.once('shutdown', () => this.releaseInput());
+  }
+
+  /** The opponent's HUD label: "Wild <Type> Fusion" normally, "<Trainer>'s <Type> Fusion" in trainer mode. */
+  private opponentLabel(): string {
+    if (this.trainerInput) {
+      const p = this.wildFusionInput.phenotype;
+      const typeName = p.secondaryType
+        ? `${TYPES[p.primaryType].name}/${TYPES[p.secondaryType].name}`
+        : TYPES[p.primaryType].name;
+      return `${this.trainerInput.name}'s ${typeName} Fusion`;
+    }
+    return combatantLabel(this.wildFusionInput, false);
+  }
+
+  /** Intro message lines: unchanged "A wild Fusion appeared!" for the wild path, a trainer-fight greeting otherwise. */
+  private introLines(): string[] {
+    const typeName = TYPES[this.wild.fusion.phenotype.primaryType].name;
+    if (this.trainerInput) {
+      return [`${this.trainerInput.name} wants to battle!`, `${this.trainerInput.name} sent out a ${typeName} type!`];
+    }
+    return [`A wild Fusion appeared!`, `It's a ${typeName} type!`];
   }
 
   // --- Scene setup -------------------------------------------------------
@@ -315,7 +360,11 @@ export class BattleScene extends Phaser.Scene {
     this.phase = 'menu';
     this.messageText.setText('');
     this.playerMoves = resolveMoves(this.player.fusion);
-    this.menuItems = [...this.playerMoves.map((m) => m.name), 'RUN AWAY'];
+    // Trainer battles don't offer RUN AWAY (matching real trainer-battle
+    // conventions, per TODO.md) - the wild-encounter path is unchanged.
+    this.menuItems = this.trainerInput
+      ? [...this.playerMoves.map((m) => m.name)]
+      : [...this.playerMoves.map((m) => m.name), 'RUN AWAY'];
     this.selectedIndex = 0;
     this.renderMenuItems();
   }
@@ -366,7 +415,7 @@ export class BattleScene extends Phaser.Scene {
     this.phase = 'busy';
     this.clearMenuItems();
 
-    if (index === this.playerMoves.length) {
+    if (!this.trainerInput && index === this.playerMoves.length) {
       this.attemptRun();
       return;
     }
@@ -473,7 +522,8 @@ export class BattleScene extends Phaser.Scene {
 
   private winBattle(): void {
     setPlayerCurrentHp(this.player.currentHp);
-    this.say(['You won the battle!'], () => this.endBattle());
+    const message = this.trainerInput ? `You defeated ${this.trainerInput.name}!` : 'You won the battle!';
+    this.say([message], () => this.endBattle());
   }
 
   private loseBattle(): void {
@@ -481,7 +531,10 @@ export class BattleScene extends Phaser.Scene {
     // loss can't be a dead end - the player's Fusion is healed and they're
     // returned to the field rather than getting stuck.
     healPlayerFully();
-    this.say(['Your Fusion has no energy left...', 'You retreat and recover.'], () => this.endBattle());
+    const lines = this.trainerInput
+      ? [`${this.trainerInput.name} defeated you!`, 'Your Fusion has no energy left...', 'You retreat and recover.']
+      : ['Your Fusion has no energy left...', 'You retreat and recover.'];
+    this.say(lines, () => this.endBattle());
   }
 
   private endBattle(): void {
