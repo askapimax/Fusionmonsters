@@ -15,14 +15,17 @@ together, without needing to ask.
 Pre-alpha. The procedural monster catalogs (parts/types/moves/traits) and
 the breeding/genetics engine are implemented and tested (see
 [Procedural Graphics & Data Catalogs](#procedural-graphics--data-catalogs-implemented)
-below), and there's now a title screen and real character creation flow
-into a first playable zone (see [The First Zone: Fernbrook Outpost](#the-first-zone-fernbrook-outpost-implemented)),
-connected via a zone-transition mechanism to a placeholder second zone,
-a static NPC you can talk to, both wild and trainer battles, a working
-capture flow, and a roster + overflow storage system - but still no
-breeding UI, save/load, or spawn/respawn implementation. See
-[TODO.md](TODO.md) for the current task breakdown. Design decisions below
-are the accepted direction for the game as of this writing, not
+below), and there's now a title screen, real character creation, and a
+starter-Fusion pick flowing into a first playable zone (see
+[The First Zone: Fernbrook Outpost](#the-first-zone-fernbrook-outpost-implemented)),
+connected via a zone-transition mechanism to a placeholder second zone and
+an enterable field-office interior, static NPCs you can talk to, both wild
+and trainer battles, a working capture flow, persistent wild-Fusion world
+entities with a 2-minute respawn timer, a roster + overflow storage system
+with in-battle switching, a breeding UI, and save/load via `localStorage` -
+but still no egg/hatching flow, named bosses, or real second-zone content.
+See [TODO.md](TODO.md) for the current task breakdown. Design decisions
+below are the accepted direction for the game as of this writing, not
 aspirational/optional ideas.
 
 ## Elevator Pitch
@@ -91,11 +94,16 @@ gyms) runs in parallel with, and eventually converges on, that story.
 Character creation itself is now real (`src/scenes/CharacterCreationScene.ts`,
 `src/state/player.ts`) - see the next section. `npm run dev` now boots into
 a title screen first (`src/scenes/TitleScreenScene.ts`: NEW GAME starts
-character creation; CONTINUE is present but inert until save/load exists).
-Name entry has no effect beyond being stored yet (an NPC now exists to
-talk to, but none reference the player's name), and since there's no
-second character spritesheet, appearance is a Phaser tint on the one
-shared sheet rather than genuinely different art (see next section).
+character creation; CONTINUE loads a real save via `localStorage` when one
+exists, see "Progression" below, and is otherwise disabled). Character
+creation now hands off into a real starter-selection screen
+(`src/scenes/StarterSelectionScene.ts`, picking one of 3 fixed founder
+Fusions) before the world loads, rather than the roster auto-assigning a
+random founder on first battle. Name entry has no effect beyond being
+stored yet (NPCs now exist to talk to, but none reference the player's
+name), and since there's no second character spritesheet, appearance is a
+Phaser tint on the one shared sheet rather than genuinely different art
+(see next section).
 
 ## The First Zone: Fernbrook Outpost (implemented)
 
@@ -113,7 +121,14 @@ than just described here - see `src/world/startingZone.ts` and
   stub proving the mechanism, not real level design yet. A static NPC
   (`src/data/npcs.ts`, `WorldScene`'s NPC-interaction system) stands near
   the field office with a line of dialogue - face it and press the
-  interact button (Z/on-screen-A) to talk.
+  interact button (Z/on-screen-A) to talk. The field office itself is now
+  enterable (`src/world/fieldOfficeInterior.ts`): its doorstep, just south
+  of the building, transitions into a small hand-laid interior room (no
+  dedicated indoor tileset yet, so the floor reuses the outdoor path tile
+  as a placeholder) with its own NPC and the relocated healing marker (see
+  below). Three persistent wild-Fusion world entities also stand on open
+  grass around Fernbrook (`WorldScene.buildWildFusions`) - see "Spawns &
+  Named Bosses" below.
 - Unlike the procedural Fusion parts, world art is **real pixel art**, not
   generated: `src/data/tiles.ts` (ground) and `src/data/props.ts` (trees,
   the field office - bigger multi-tile objects placed on top of the
@@ -142,15 +157,16 @@ than just described here - see `src/world/startingZone.ts` and
   view), so this works on both phone and desktop viewports.
 - A Game Boy-style Start button sits next to the D-pad (also bound to
   Enter on keyboard) and opens a pause menu (`src/scenes/PauseMenuScene.ts`):
-  INVENTORY, REGISTRY, STORAGE, SAVE, CLOSE. It's properly D-pad-navigable,
-  not just clickable: Up/Down (arrow keys or the D-pad) move a `>` cursor
-  between options, A (Z key or the on-screen A button) confirms the
-  highlighted one, B (X key or the on-screen B button) backs out and
-  closes the menu - the on-screen A/B buttons sit next to Start
+  INVENTORY, REGISTRY, STORAGE, BREED, SAVE, CLOSE. It's properly
+  D-pad-navigable, not just clickable: Up/Down (arrow keys or the D-pad)
+  move a `>` cursor between options, A (Z key or the on-screen A button)
+  confirms the highlighted one, B (X key or the on-screen B button) backs
+  out and closes the menu - the on-screen A/B buttons sit next to Start
   (`index.html`, `src/input/touchControls.ts`). Clicking/tapping a label
-  directly still works too and keeps the keyboard cursor in sync. SAVE is
-  a real, present menu entry that intentionally does nothing yet beyond a
-  "Not available yet." notice - see TODO.md.
+  directly still works too and keeps the keyboard cursor in sync. BREED
+  opens the breeding UI (see "Breeding & Genetics" below) and SAVE now
+  really serializes the game to `localStorage` (see "Progression" below) -
+  both replace what used to be inert placeholders.
 - INVENTORY opens `src/scenes/InventoryScene.ts`: a Pokemon-bag-style
   grid of item slots, in the same dark-panel/monospace UI style as the
   pause menu (`src/ui/panel.ts`). It's real, data-driven UI backed by a
@@ -170,11 +186,16 @@ than just described here - see `src/world/startingZone.ts` and
   of every distinct Fusion signature discovered so far (see "The Concord
   registry" under Progression below), same dark-panel/monospace style and
   open/close conventions as Inventory. The registry
-  (`src/state/registry.ts`) has two writers today: every wild encounter
-  (`WorldScene.maybeTriggerEncounter`) and the player's own auto-assigned
-  Fusion (`src/state/party.ts`) both register into it; bred offspring will
-  too once the in-game breeding UI exists. Registry state is in-memory
-  only for now (resets on reload) until Save/load lands.
+  (`src/state/registry.ts`) has three writers today: every wild encounter
+  (`WorldScene.maybeTriggerEncounter`), the player's own starter Fusion,
+  and bred offspring (`src/scenes/BreedingScene.ts`) all register into it.
+  Registry state now survives a reload via Save/load (see "Progression"
+  below).
+- BREED opens `src/scenes/BreedingScene.ts`: pick two parent Fusions from
+  the combined roster + storage pool, and confirming produces a new,
+  already-bred offspring Fusion via the existing `breed()` engine, added
+  to the roster (or storage if the roster is full) - see "Breeding &
+  Genetics" below for what this does and doesn't cover yet.
 
 Run it: `npm install && npm run dev`.
 
@@ -214,11 +235,12 @@ rest of the UI, reachable by walking into tall grass (see
 [Spawns & Named Bosses](#spawns--named-bosses) below). What's real vs. still
 the design above:
 
-- One Fusion actively battles per side (`src/state/party.ts` now holds a
-  real up-to-6 roster, see "Party roster" under Progression below, but
-  there's no in-battle switching yet and no starter-selection flow, so the
-  player is still auto-assigned a random founder into the roster's first
-  slot the first time a battle is needed).
+- One Fusion actively battles per side, but the player can now switch to a
+  different roster member mid-battle (`src/state/party.ts` holds a real
+  up-to-6 roster, see "Party roster" under Progression below) - a
+  voluntary SWITCH costs the turn, a forced switch on faint doesn't. The
+  roster starts with a real player-picked starter Fusion (see "Character
+  Creation" above) rather than an auto-assigned random founder.
 - Damage uses type effectiveness, STAB, Physical (Attack/Defense) vs.
   Special (Focus/Resist) stats, and move accuracy, plus a working (if
   simplified) status layer: heals, +/-stat stages, burn/poison
@@ -228,16 +250,16 @@ the design above:
   camera shake, and an HP bar that visibly drains rather than jumping.
 - A wild battle now ends in a win, a capture (see "Catching Fusions"
   below), a loss (which fully heals the player and returns them to the
-  field - the player can also heal proactively via a standalone healing
-  marker outside Fernbrook's field office), or running away (which always
-  succeeds against a wild Fusion). Trainer battles now exist too
-  (`src/data/trainers.ts`, `BattleScene`'s trainer mode) - no RUN AWAY or
-  SAMPLE KIT option, trainer-flavored messages - triggered by a temporary
-  standalone world trigger; a real NPC-interaction system now exists too
-  (used for talking to static NPCs, see "The First Zone" above) but hasn't
-  been swapped in for the trainer trigger yet. No leveling/XP - a Fusion's
-  power is fixed by its genome, so winning grants no numeric reward beyond
-  the win.
+  field - the player can also heal proactively via a healing marker now
+  inside the field office's interior, see "The First Zone" above), or
+  running away (which always succeeds against a wild Fusion). Trainer
+  battles now exist too (`src/data/trainers.ts`, `BattleScene`'s trainer
+  mode) - no RUN AWAY or SAMPLE KIT option, trainer-flavored messages -
+  triggered by a temporary standalone world trigger; a real NPC-interaction
+  system now exists too (used for talking to static NPCs, see "The First
+  Zone" above) but hasn't been swapped in for the trainer trigger yet. No
+  leveling/XP - a Fusion's power is fixed by its genome, so winning grants
+  no numeric reward beyond the win.
 
 ## Catching Fusions
 
@@ -287,10 +309,17 @@ rare there, using the same weighted-random pattern as part `rarityWeight`.
 Fernbrook Outpost favors flora/aqua and makes thermal/mineral/photon rare
 finds. Parts/traits/moves/stats stay fully random within whichever type
 gets rolled - only the primary type is zone-biased so far, and it's still
-one table per zone rather than a per-species roster. Named bosses and the
-2-minute respawn timer aren't wired up yet, and defeated wild Fusions don't
-persist in the world to respawn at all (they're generated fresh per
-encounter, not placed).
+one table per zone rather than a per-species roster.
+
+Separately, 3 persistent wild-Fusion world entities now stand on fixed
+spots around Fernbrook (`src/world/wildFusionState.ts`,
+`WorldScene.buildWildFusions`) - each rendered as its own map sprite,
+holding a stable Fusion instance rather than rolling fresh per encounter.
+Defeating or catching one removes it from the map and starts the flat,
+global 2-minute respawn timer described above, after which the exact same
+Fusion reappears. Named bosses still aren't implemented - the mechanism
+above is designed to extend to them (a longer, per-boss respawn timer and
+guaranteed loot), but no boss content or loot tables exist yet.
 
 ## Breeding & Genetics
 
@@ -404,14 +433,31 @@ mutation bounds, dual-typing carrier behavior, registry de-duplication).
 ## Progression
 
 - **Party roster** — up to 6 Fusions (`src/state/party.ts`), a data layer
-  (add/remove/reorder/active-slot operations) with the capture flow now
-  filling it (see "Catching Fusions" above) - still no in-battle switching
-  or a roster-browsing screen, only the pause menu's REGISTRY/STORAGE
-  screens browse discovered signatures/stored overflow respectively.
+  (add/remove/reorder/active-slot operations) filled by capture, starter
+  selection, and breeding, with in-battle switching now live (see
+  "Battling" above) - still no dedicated roster-browsing/reorder screen,
+  only the pause menu's REGISTRY/STORAGE screens browse discovered
+  signatures/stored overflow respectively.
 - **Fusion storage** — an uncapped overflow box (`src/state/storage.ts`,
   `src/scenes/StorageScene.ts`, opened via the pause menu's STORAGE entry)
   for Fusions beyond the 6-slot roster - browse and withdraw are
   implemented; there's no "deposit from roster" flow yet.
+- **Breeding UI** — the pause menu's BREED entry (`src/scenes/BreedingScene.ts`)
+  picks two parents from the roster/storage pool and produces a new,
+  already-bred Fusion via the real genetics engine (see "Breeding &
+  Genetics" above), added to the roster or storage. It skips the
+  egg/hatching step described above - the offspring is born immediately,
+  not laid as an egg that hatches later (that's still a separate,
+  not-yet-built TODO item) - and doesn't gate on breeding-group
+  compatibility.
+- **Save/load** — SAVE in the pause menu (`src/state/save.ts`) serializes
+  the player's position/appearance/name, roster, storage, active-slot
+  index, inventory, and the Concord registry into one blob in
+  `localStorage`; the title screen's CONTINUE option loads it back and
+  drops the player back into the world at the saved spot, skipping
+  character creation and starter selection. Story flags aren't part of
+  the save yet since no story-flag system exists (see "Bastions"/"Story
+  arc" below).
 - **Bastions** — regional Concord research stations, each with a signature
   Fusion specialist to defeat, functioning as this game's gym/badge
   equivalent and gating story progress.
