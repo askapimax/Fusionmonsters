@@ -16,6 +16,18 @@ export const MAP_ROWS = 30;
 
 export const SPAWN = { col: 20, row: 9 };
 
+/**
+ * A "Fusion Center"-equivalent healing spot, placed just outside the field
+ * office's door. The field office itself isn't enterable yet (no interior/
+ * zone-transition system - see TODO.md), so this is a deliberate outdoor
+ * scope-reduction rather than a real interior NPC: a single interactable
+ * tile the player faces and presses A/Z on (see `WorldScene.checkInteraction`)
+ * to fully restore their active Fusion's HP, the same effect
+ * `BattleScene.loseBattle`'s free full-heal already grants on a loss. Move
+ * this into a real field-office interior once that exists.
+ */
+export const HEALING_SPOT = { col: 23, row: 7 };
+
 function buildGround(): TileId[][] {
   const map: TileId[][] = Array.from({ length: MAP_ROWS }, () =>
     Array.from({ length: MAP_COLS }, () => 'grass' as TileId),
