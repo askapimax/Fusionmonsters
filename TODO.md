@@ -283,12 +283,26 @@ into).
       overlays) since `DialogueScene` doesn't pause anything itself and a
       scene's own input bindings (e.g. `WorldScene`'s Enter-opens-menu)
       would otherwise also react to the same keypress.
-- [ ] NPC entity system: place static NPCs on a zone map (sprite + facing
-      direction + a line or two of dialogue), block their tile like a
-      prop, and let the player interact with one by facing it and
-      pressing A, triggering the dialogue box above. The trainer-battle
-      trigger and healing marker below are temporary standalone stand-ins
-      for this system in the meantime - swap them over once this lands.
+- [x] NPC entity system (`src/data/npcs.ts`, `WorldScene.buildNpcs`/
+      `maybeTalkToNpc`): an `NpcDef` catalog (id, static facing direction,
+      an optional tint on the shared player spritesheet since there's no
+      NPC-specific art, dialogue lines) plus additive Fernbrook placement
+      data (`STARTING_ZONE_NPCS` in `src/world/startingZone.ts`, mirroring
+      `STARTING_ZONE_TRAINERS`'s catalog/placement split). `WorldScene`
+      renders each as a static tinted sprite, blocks its tile, and wires
+      talking to one into the existing `checkInteraction()` method
+      (already bound to Z/on-screen-A): facing an NPC and pressing
+      interact pauses `WorldScene` and launches `DialogueScene` with its
+      lines, resuming on close. One real NPC placed ("Field Tech Bram"
+      near the field office) to demonstrate it. Kept Fernbrook-only
+      (gated on `zoneDef.zoneId === ZONE_ID`), matching how the healing
+      marker/trainer trigger already scope themselves - NPCs aren't part
+      of the generic `ZoneDef` shape yet. Verified end to end via headless
+      browser. Follow-ups: migrating the healing-marker/trainer-battle
+      stand-ins onto this system is still separate work (unchanged, left
+      exactly as they were); no NPC movement/patrol/animation (fully
+      static); no branching/conditional dialogue (always replays the same
+      fixed lines).
 - [ ] Make the Concord field office enterable: an interior scene/room
       (small hand-laid indoor map) that the field-office prop's door tile
       transitions into/out of via the zone-transition system above, with
@@ -314,13 +328,31 @@ into).
       Outpost using the system above: pick its Fusion build, its
       guaranteed-loot table entry (rare part / guaranteed-dominant allele
       / unique cosmetic variant per README), and its respawn timer value.
-- [ ] Capture flow: a "sample kit" item usable from the battle move menu
-      (alongside/instead of a move), a catch-rate formula scaled by the
-      wild Fusion's remaining HP%, status condition, and the kit's
-      strength (`src/battle/battleEngine.ts` has the HP/status state this
-      needs), and on success add the caught Fusion to the player's roster
-      (see Party management below) instead of the battle only ever ending
-      in win/loss/run.
+- [x] Capture flow: `computeCatchChance`/`attemptCapture`
+      (`src/battle/battleEngine.ts`) - a pure, documented catch-rate curve
+      scaled by the wild Fusion's remaining HP fraction (lower HP = better
+      odds) and a flat bonus for any status condition, times the item's
+      `kitStrength` (placeholder constants, not tuned balance). The Sample
+      Kit item (`src/data/items.ts`) now has a real `{ kind: 'capture';
+      strength }` effect instead of its old inert placeholder.
+      `src/state/inventory.ts` gained `hasItem`/`consumeItem` helpers.
+      `BattleScene` shows a SAMPLE KIT move-menu option only in wild
+      encounters (never trainer battles - same conditional that already
+      excludes RUN AWAY there) and only when the player holds one; success
+      calls `addToRoster`, or (now that Fusion storage exists too, see
+      below) `depositToStorage` if the roster is full, so a catch is never
+      silently lost; failure ("It broke free!") gives the wild Fusion one
+      real turn through the same turn-resolution pipeline a move uses,
+      so spamming the kit isn't a strictly-safe alternative to attacking.
+      8 new Vitest cases cover the catch-rate curve (near-guaranteed
+      success/failure at the extremes, real probabilities at midpoints,
+      monotonicity, kit-strength scaling). Verified via headless browser:
+      SAMPLE KIT appears in wild encounters, is absent from trainer
+      battles, and a failed catch correctly gives the wild Fusion a real
+      turn before reopening the menu. Follow-ups: catch-rate constants and
+      the base kit's `strength: 1` are placeholder balance; a stronger/
+      weaker capture item is now easy to add (different `strength`, same
+      formula).
 
 ### Battling
 - [x] Trainer-battle type (`src/data/trainers.ts`): a `TrainerDef` data
@@ -387,19 +419,40 @@ into).
       item was about giving the player another way to heal, not about
       removing that safety net, which stays deliberate until capture/
       party stakes exist (see Capture flow above).
-- [ ] Discovered while building the healing marker above: `WorldScene`'s
-      top-left HUD text (zone name / controls hint) is invisible on screen
-      - `setScrollFactor(0)` cancels camera scroll but not the 3x camera
-      zoom, so the fixed-position text renders off the visible area. Pre-
-      existing, unrelated to any of the items above; fix by either giving
-      it a dedicated unzoomed UI camera or repositioning/rescaling it to
-      account for the zoom.
+- [x] Fixed: `WorldScene`'s top-left HUD text (zone name / controls hint)
+      was invisible - `setScrollFactor(0)` cancels camera scroll but not
+      zoom, and Phaser anchors zoom on the camera's *center*, not its
+      top-left corner, so the fixed-position text at `(8, 8)` was
+      rendering 3x too large and displaced off-canvas rather than merely
+      "too far from the origin". Fixed by inverting that center-anchored
+      transform (a small `hudPoint()` helper in `create()`) plus
+      `.setScale(1 / cameraZoom)` to cancel the zoom back out of the
+      rendered size - kept scoped to the `create()` block (a second
+      unzoomed UI camera was considered but would've needed broader
+      composition changes across `scene.restart()`). Verified visually:
+      before, the text was absent from the rendered canvas; after, "Zone
+      name / controls hint" renders legibly in the top-left and stays
+      screen-fixed correctly during normal camera-follow movement.
 
 ### Breeding UI & Progression
-- [ ] Fusion storage ("box") system: a place to keep Fusions beyond the
-      6-slot active roster (caught/bred Fusions exceeding party capacity
-      need somewhere to go), plus a simple browse/withdraw/deposit screen
-      in the existing panel UI style.
+- [x] Fusion storage ("box") system (`src/state/storage.ts`,
+      `src/scenes/StorageScene.ts`): an uncapped overflow list of Fusions
+      (mirroring `party.ts`'s singleton style - `depositToStorage`,
+      `withdrawFromStorage`, `getStorage`), no "active slot"/live-HP
+      concept since stored Fusions are never mid-battle (a withdrawn one
+      gets full HP the same way any `addToRoster` addition does). A new
+      STORAGE entry in the pause menu opens a browse screen (same
+      `InventoryScene`-style D-pad grid cursor) that withdraws a selected
+      Fusion into the active roster if there's room, or explains why not
+      without losing it either way. Seeded with two deterministic demo
+      Fusions so it's demonstrable before any real caller exists; the
+      capture flow above now calls `depositToStorage` when the roster is
+      full instead of dropping the catch. 11 new Vitest cases. Verified
+      end to end via headless browser (browsed the seeded box, withdrew a
+      Fusion into the roster, closed cleanly). Follow-ups: no "move roster
+      member to storage" (deposit direction) flow yet; no sorting/
+      filtering/scrolling once storage genuinely grows past one 18-slot
+      grid (fine at today's scale - 2 demo items).
 - [ ] In-game breeding UI: a screen to pick two compatible Fusions (same
       breeding group, per README) from the roster/storage above and
       produce an egg by calling the existing `breed()` engine
@@ -429,9 +482,17 @@ into).
       "Not available yet."), and load it back on boot when present. Best
       attempted once roster/storage/character-creation/story-flags exist
       to actually serialize - premature before then.
-- [ ] Title screen / main menu scene shown before `WorldScene` boots:
-      New Game (starts character creation) and Continue (loads the save
-      above, only enabled/shown when one exists).
+- [x] Title screen (`src/scenes/TitleScreenScene.ts`): now the actual boot
+      scene, ahead of `CharacterCreationScene`, in the same dark-panel/
+      monospace cursor-list style as `PauseMenuScene`. NEW GAME starts
+      `CharacterCreationScene` (which still hands off to `WorldScene` as
+      before). CONTINUE has nothing to load since save/load doesn't exist
+      yet (see above) - kept present-but-disabled (dimmed, no-op, "No save
+      data yet." hint) rather than omitted, so only an `enabled`
+      flag/real load call needs to change once save/load lands, not the
+      menu's shape. Verified via headless browser: title boots first, NEW
+      GAME → character creation → world all work, CONTINUE is correctly
+      inert.
 
 ### Art & Audio
 - [ ] Resolve the Tuxemon asset situation before shipping: either write
@@ -459,6 +520,16 @@ into).
       though only `WorldScene` is needed at boot (see the code-split entry
       above). Needs real `npm run dev` + manual scene-launch verification
       before landing, not just a code read.
-- [ ] Wire `src/scenes/CatalogPreviewScene.ts` in behind a debug flag/route,
-      or remove it - it's fully built but not referenced anywhere in
-      `src/main.ts`, dead code from the bundle's perspective.
+- [x] Wired `src/scenes/CatalogPreviewScene.ts` in behind a
+      `?debug=catalog-preview` URL flag (chosen over removing it - it's a
+      genuinely useful, fast end-to-end check of the catalog → genome →
+      breeding → phenotype → composited-texture pipeline, and the project
+      had no debug routes yet to weigh against). Without the flag, boot
+      behavior is byte-for-byte the same as before (`TitleScreenScene`
+      still auto-starts); with it, `CatalogPreviewScene` takes that first
+      slot instead so Phaser auto-starts it in place of (not alongside)
+      the normal flow - an earlier attempt that called `scene.start()`
+      after game creation instead left the previous boot scene's DOM
+      overlay running underneath it. App chunk grows ~3.2KB/~1KB gzip.
+      Verified via headless browser: normal boot unaffected, the debug
+      route renders the breeding-preview visuals correctly.

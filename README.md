@@ -15,11 +15,12 @@ together, without needing to ask.
 Pre-alpha. The procedural monster catalogs (parts/types/moves/traits) and
 the breeding/genetics engine are implemented and tested (see
 [Procedural Graphics & Data Catalogs](#procedural-graphics--data-catalogs-implemented)
-below), and there's now a first playable zone with a real character
-creation flow (see [The First Zone: Fernbrook Outpost](#the-first-zone-fernbrook-outpost-implemented))
-connected via a zone-transition mechanism to a placeholder second zone, a
-roster data layer, and both wild and trainer battles - but still no
-capturing or breeding UI, and no spawn/respawn implementation. See
+below), and there's now a title screen and real character creation flow
+into a first playable zone (see [The First Zone: Fernbrook Outpost](#the-first-zone-fernbrook-outpost-implemented)),
+connected via a zone-transition mechanism to a placeholder second zone,
+a static NPC you can talk to, both wild and trainer battles, a working
+capture flow, and a roster + overflow storage system - but still no
+breeding UI, save/load, or spawn/respawn implementation. See
 [TODO.md](TODO.md) for the current task breakdown. Design decisions below
 are the accepted direction for the game as of this writing, not
 aspirational/optional ideas.
@@ -88,8 +89,11 @@ gyms) runs in parallel with, and eventually converges on, that story.
 - You start with a starter Fusion given to you at a Bastion at story start.
 
 Character creation itself is now real (`src/scenes/CharacterCreationScene.ts`,
-`src/state/player.ts`) - see the next section. Name entry has no effect
-beyond being stored yet (no NPC/UI references it), and since there's no
+`src/state/player.ts`) - see the next section. `npm run dev` now boots into
+a title screen first (`src/scenes/TitleScreenScene.ts`: NEW GAME starts
+character creation; CONTINUE is present but inert until save/load exists).
+Name entry has no effect beyond being stored yet (an NPC now exists to
+talk to, but none reference the player's name), and since there's no
 second character spritesheet, appearance is a Phaser tint on the one
 shared sheet rather than genuinely different art (see next section).
 
@@ -106,7 +110,10 @@ than just described here - see `src/world/startingZone.ts` and
   front of, plus scattered trees. The map's south gap now connects to a
   second zone via the zone-transition system (see "World & Exploration"
   in TODO.md) - currently just a tiny, explicitly-placeholder "Route 1"
-  stub proving the mechanism, not real level design yet.
+  stub proving the mechanism, not real level design yet. A static NPC
+  (`src/data/npcs.ts`, `WorldScene`'s NPC-interaction system) stands near
+  the field office with a line of dialogue - face it and press the
+  interact button (Z/on-screen-A) to talk.
 - Unlike the procedural Fusion parts, world art is **real pixel art**, not
   generated: `src/data/tiles.ts` (ground) and `src/data/props.ts` (trees,
   the field office - bigger multi-tile objects placed on top of the
@@ -135,26 +142,30 @@ than just described here - see `src/world/startingZone.ts` and
   view), so this works on both phone and desktop viewports.
 - A Game Boy-style Start button sits next to the D-pad (also bound to
   Enter on keyboard) and opens a pause menu (`src/scenes/PauseMenuScene.ts`):
-  INVENTORY, REGISTRY, SAVE, CLOSE. It's properly D-pad-navigable, not just
-  clickable: Up/Down (arrow keys or the D-pad) move a `>` cursor between
-  options, A (Z key or the on-screen A button) confirms the highlighted
-  one, B (X key or the on-screen B button) backs out and closes the menu -
-  the on-screen A/B buttons sit next to Start (`index.html`,
-  `src/input/touchControls.ts`). Clicking/tapping a label directly still
-  works too and keeps the keyboard cursor in sync. SAVE is a real, present
-  menu entry that intentionally does nothing yet beyond a "Not available
-  yet." notice - see TODO.md.
+  INVENTORY, REGISTRY, STORAGE, SAVE, CLOSE. It's properly D-pad-navigable,
+  not just clickable: Up/Down (arrow keys or the D-pad) move a `>` cursor
+  between options, A (Z key or the on-screen A button) confirms the
+  highlighted one, B (X key or the on-screen B button) backs out and
+  closes the menu - the on-screen A/B buttons sit next to Start
+  (`index.html`, `src/input/touchControls.ts`). Clicking/tapping a label
+  directly still works too and keeps the keyboard cursor in sync. SAVE is
+  a real, present menu entry that intentionally does nothing yet beyond a
+  "Not available yet." notice - see TODO.md.
 - INVENTORY opens `src/scenes/InventoryScene.ts`: a Pokemon-bag-style
   grid of item slots, in the same dark-panel/monospace UI style as the
   pause menu (`src/ui/panel.ts`). It's real, data-driven UI backed by a
   real (if still small) item catalog (`src/data/items.ts`: two heal items,
-  a status-cure item, and an inert Sample Kit placeholder for the
-  not-yet-built capture flow) and a seeded starting inventory
+  a status-cure item, and a Sample Kit that's now a real, usable capture
+  item - see "Catching Fusions" above) and a seeded starting inventory
   (`src/state/inventory.ts`). It's D-pad-navigable like the pause menu:
   Up/Down/Left/Right move a highlighted cursor around the grid (clamped,
   not wrapped, at the edges), A/Enter/Z shows the selected item's name and
-  description, B/X closes it. There's no "use item" system yet (in battle
-  or the overworld) - selecting an item is informational only for now.
+  description, B/X closes it. There's still no "use item" system in the
+  overworld (only in battle, via the Sample Kit) - selecting a non-battle
+  item is informational only for now.
+- STORAGE opens `src/scenes/StorageScene.ts`: the same panel-grid style as
+  INVENTORY, browsing the Fusion storage box (see "Progression" below) and
+  withdrawing a selected Fusion into the active roster if there's room.
 - REGISTRY opens `src/scenes/ConcordRegistryScene.ts`: a scrollable list
   of every distinct Fusion signature discovered so far (see "The Concord
   registry" under Progression below), same dark-panel/monospace style and
@@ -215,18 +226,18 @@ the design above:
   type's hidden move.
 - Every step is animated: an intro fade-in, an attack lunge, a hit-flash +
   camera shake, and an HP bar that visibly drains rather than jumping.
-- No capture yet - a battle only ends in a win, a loss (which fully heals
-  the player and returns them to the field, since there's no
-  healing-item economy to make a loss otherwise survivable - though the
-  player can now also heal proactively via a standalone healing marker
-  outside Fernbrook's field office, see "Battling" below in TODO.md), or
-  running away (which always succeeds against a wild Fusion). Trainer
-  battles now exist too (`src/data/trainers.ts`,
-  `BattleScene`'s trainer mode) - no RUN AWAY option, trainer-flavored
-  messages - triggered by a temporary standalone world trigger rather
-  than real NPC interaction (that system doesn't exist yet). No
-  leveling/XP - a Fusion's power is fixed by its genome, so winning grants
-  no numeric reward beyond the win.
+- A wild battle now ends in a win, a capture (see "Catching Fusions"
+  below), a loss (which fully heals the player and returns them to the
+  field - the player can also heal proactively via a standalone healing
+  marker outside Fernbrook's field office), or running away (which always
+  succeeds against a wild Fusion). Trainer battles now exist too
+  (`src/data/trainers.ts`, `BattleScene`'s trainer mode) - no RUN AWAY or
+  SAMPLE KIT option, trainer-flavored messages - triggered by a temporary
+  standalone world trigger; a real NPC-interaction system now exists too
+  (used for talking to static NPCs, see "The First Zone" above) but hasn't
+  been swapped in for the trainer trigger yet. No leveling/XP - a Fusion's
+  power is fixed by its genome, so winning grants no numeric reward beyond
+  the win.
 
 ## Catching Fusions
 
@@ -235,6 +246,14 @@ battle and then using a capture item gives a chance to catch it, scaled by
 remaining HP, status effects, and item strength — the familiar
 weaken-then-throw-a-ball loop, renamed to fit the setting (capture devices
 are Concord-issued "sample kits").
+
+**Implemented**: a SAMPLE KIT move-menu option in wild battles
+(`src/scenes/BattleScene.ts`, `src/battle/battleEngine.ts`'s
+`computeCatchChance`/`attemptCapture`) - only offered when the player holds
+one and never in trainer battles. A successful catch joins the active
+roster, or Fusion storage if the roster is full; a failed one ("It broke
+free!") gives the wild Fusion a real turn rather than a free pass. Catch-
+rate constants are placeholder balance, not tuned.
 
 ## Spawns & Named Bosses
 
@@ -384,10 +403,15 @@ mutation bounds, dual-typing carrier behavior, registry de-duplication).
 
 ## Progression
 
-- **Party roster** — up to 6 Fusions (`src/state/party.ts`), implemented
-  as a data layer (add/remove/reorder/active-slot operations) ahead of any
-  UI or way to actually fill it beyond the auto-assigned starter - see
-  TODO.md's "Battling" section.
+- **Party roster** — up to 6 Fusions (`src/state/party.ts`), a data layer
+  (add/remove/reorder/active-slot operations) with the capture flow now
+  filling it (see "Catching Fusions" above) - still no in-battle switching
+  or a roster-browsing screen, only the pause menu's REGISTRY/STORAGE
+  screens browse discovered signatures/stored overflow respectively.
+- **Fusion storage** — an uncapped overflow box (`src/state/storage.ts`,
+  `src/scenes/StorageScene.ts`, opened via the pause menu's STORAGE entry)
+  for Fusions beyond the 6-slot roster - browse and withdraw are
+  implemented; there's no "deposit from roster" flow yet.
 - **Bastions** — regional Concord research stations, each with a signature
   Fusion specialist to defeat, functioning as this game's gym/badge
   equivalent and gating story progress.
