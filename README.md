@@ -371,13 +371,13 @@ is implemented in code, not just described here; see `src/`.
   hue/scale jitter (seeded from the genome's own `visualSeed`, so the same
   individual always renders the same way) on top of the inherited part
   choice. This is the "little random factor in addition to inheritance."
-- **`src/scenes/CatalogPreviewScene.ts`** — a debug Phaser scene (not wired
-  into `main.ts` right now, since `WorldScene` is the active boot scene -
-  see "The First Zone" above) that breeds two random wild Fusions together
-  and renders both parents and the offspring on screen, to prove the whole
-  pipeline (catalog → genome → breeding → phenotype → composited texture)
-  works end to end. Swap it into `main.ts`'s `scene: [...]` list to use it
-  again.
+- **`src/scenes/CatalogPreviewScene.ts`** — a debug Phaser scene that breeds
+  two random wild Fusions together and renders both parents and the
+  offspring on screen, to prove the whole pipeline (catalog → genome →
+  breeding → phenotype → composited texture) works end to end. It's
+  registered in `main.ts`'s `scene: [...]` list but never auto-started;
+  load the game with `?debug=catalog-preview` in the URL to jump straight
+  to it instead of the normal character-creation/world boot flow.
 
 `npm test` runs the breeding-engine unit tests (dominance expression,
 mutation bounds, dual-typing carrier behavior, registry de-duplication).
