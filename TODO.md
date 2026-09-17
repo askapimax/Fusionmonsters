@@ -5,6 +5,14 @@ story/mechanics these tasks implement. Keep this updated as work lands —
 move items between sections rather than letting this drift out of sync with
 reality.
 
+Each unchecked item below is scoped to be doable as a single, self-contained
+task (one PR, one agent session) — big features are broken into the smaller
+pieces that build up to them rather than listed as one giant bullet. Items
+within a section are roughly in the order they unblock each other; later
+sections generally depend on earlier ones (e.g. breeding UI wants a real
+party/storage system first, capture wants a roster to put caught Fusions
+into).
+
 ## Done
 
 - [x] Repo scaffolding: README (story + mechanics), Apache 2.0 LICENSE,
@@ -95,43 +103,12 @@ reality.
       selected option, the real on-screen B button (dispatched pointer
       events, not a synthetic tap) closes the menu, and movement still
       works after every close path.
-
-## To Do
-
-### World & Exploration
-- [ ] Character creation flow (male/female appearance, name entry) - the
-      player currently spawns with one fixed default look.
-- [ ] Starter-Fusion selection at story start.
-- [ ] More zones/routes beyond Fernbrook Outpost, and a way to travel
-      between them (the current map's south gap doesn't lead anywhere
-      yet).
-- [ ] NPCs, dialogue, and making the field office enterable (it's
-      currently a solid decorative block).
-
-### Spawns & Encounters
 - [x] Wild-encounter roll on tall-grass tiles (`TILES[...].encounterZone`,
       `src/data/wildEncounters.ts`): each step onto one has a flat 12%
       chance to start a battle against a freshly-generated random founder
       Fusion. Wired into `WorldScene.maybeTriggerEncounter`, called from
       the movement-tween's `onComplete` so it can never fire mid-step or
       while a menu/battle is already open.
-- [ ] Per-zone spawn tables (which Fusions can appear, with individual
-      spawn-probability weights — see README "Spawns & Named Bosses").
-      Right now any encounter tile in the one zone can produce *any*
-      random founder, with no bias by type/rarity/part.
-- [ ] Global 2-minute respawn timer for regular mobs — moot until there's
-      something zone-persistent to respawn; current wild Fusions are
-      generated fresh per encounter and don't exist in the world otherwise.
-- [ ] Named-boss system: unique hand-placed Fusions per dungeon/zone with
-      guaranteed special loot and their own (longer, currently
-      placeholder) respawn timers.
-- [ ] Design the actual named bosses per zone and their loot tables (not
-      just the system — the content itself).
-- [ ] Wild-encounter → capture flow (weaken, throw a sample kit, catch-rate
-      math). A wild encounter currently only ends in a win, a loss, or
-      running away — there's no way to keep the Fusion you just fought.
-
-### Battling
 - [x] Turn-based battle scene/UI (`src/scenes/BattleScene.ts`), in the
       same dark-panel/monospace style as the rest of the UI: Pokemon-style
       layout (wild top-right on its own platform, player bottom-left,
@@ -141,7 +118,7 @@ reality.
       reused directly). A 2-column move grid (up to 4 moves + RUN AWAY)
       replaces the message box once it's the player's turn; RUN AWAY
       always succeeds (no capture/party system yet to make failure
-      meaningful - see above). Simple tween-based "juice": an intro
+      meaningful - see below). Simple tween-based "juice": an intro
       fade-in, an attack lunge, a hit-flash + camera shake, and an
       animated HP-bar drain.
 - [x] Damage formula using type effectiveness (`getTypeEffectiveness`),
@@ -154,45 +131,6 @@ reality.
       magnitudes are placeholder balance, not final tuning, and status
       conditions only last for the current battle (nothing persists
       outside it, e.g. into the overworld or a later encounter).
-- [ ] Trainer (rival/Chimera Nine) battles vs. wild battles - only wild
-      battles exist so far.
-- [ ] Party management (up to 6 Fusions, switching, fainting). The player
-      currently has exactly one battling Fusion, auto-assigned the first
-      time a battle is needed (`src/state/party.ts`) since there's no
-      starter-selection flow yet either (same "skip the unbuilt flow"
-      shortcut WorldScene already took for character creation) - no
-      selection, no roster, no switching mid-battle.
-- [ ] No leveling/XP - by design, a Fusion's power comes from its genome
-      (breeding), not from grinding battles, so winning currently grants
-      no numeric reward at all beyond the win itself. Losing heals the
-      player's Fusion back to full and returns them to the field, since
-      there's no Fusion-Center-equivalent healing economy yet to make a
-      loss otherwise recoverable - a deliberate safety net, not the
-      intended long-term design.
-
-### Breeding UI & Progression
-- [ ] In-game breeding UI (pick two compatible Fusions, produce an egg,
-      hatch into a new Fusion using the existing `breed()` engine).
-- [ ] Egg/hatching flow and timing.
-- [ ] Concord registry UI (browse discovered signatures/species).
-- [ ] Bastion structure: regional gym-equivalents, specialist battles,
-      story gating.
-- [ ] Story content: Chimera Nine encounters, the Unraveling plot beats.
-
-### Persistence & Platform
-- [ ] Save/load (local storage first, per README Tech Stack). The pause
-      menu already has a SAVE entry (`src/scenes/PauseMenuScene.ts`) -
-      it currently just shows "Not available yet." and needs real
-      save-state logic wired in.
-- [ ] Decide on and build the game's main menu / UI shell.
-- [ ] Actual items in `src/data/items.ts` and ways to obtain them - the
-      inventory screen is built and correctly renders whatever's there,
-      but nothing populates it yet. Once there are items, give the
-      inventory grid the same D-pad cursor + A/B handling the pause menu
-      has (`src/scenes/InventoryScene.ts` only has a B-button back action
-      so far - there's nothing to move a cursor between yet).
-
-### Art & Audio
 - [x] Re-polished the procedural Fusion-part generator (`pixelArt.ts`):
       parts are now built from overlapping ellipses with automatic
       perimeter outlining and position-based highlight/shadow shading,
@@ -203,22 +141,167 @@ reality.
       option later, but the gap with the rest of the art is much
       smaller now. Verified via the same catalog-preview + full-Phaser-
       texture-pipeline check as the world art got.
-- [ ] The world tiles/props/character are borrowed from another project
-      (Tuxemon, CC BY-SA 4.0 / XYG license - see public/assets/CREDITS.md)
-      as a stand-in. Fine for prototyping, but a real game needs either a
-      license-compliant release story for these exact files or original
-      replacements before shipping.
-- [ ] Only 4 ground tiles + 2 props exist (grass/tall grass/path/water,
-      tree/field office). No dedicated sign, fence, second building, or
-      any indoor tileset yet.
-- [ ] Sound effects / music.
-
-### Engineering
 - [x] CI + deploy: `.github/workflows/deploy-pages.yml` runs typecheck +
       test + build on every push to the default branch, then publishes
       to the `gh-pages` branch. Live at
       https://askapimax.github.io/Fusionmonsters/ once the one manual
       Settings → Pages step (see README "Playing it online") is done.
+
+## To Do
+
+### World & Exploration
+- [ ] Character creation scene: pick male/female appearance (cosmetic
+      only, per README) and enter a name, shown once before `WorldScene`
+      boots. Store the choice (e.g. a small `src/state/player.ts`) and use
+      it to pick which spritesheet `src/data/character.ts` hands to the
+      player object, instead of `WorldScene` always spawning the single
+      hardcoded default look.
+- [ ] Starter-Fusion selection flow: a small screen/scene (e.g. presented
+      at the field office) offering a handful of founder Fusions to pick
+      from at story start, writing the choice into the party system below
+      instead of `src/state/party.ts` auto-assigning a random founder the
+      first time a battle happens.
+- [ ] Zone-transition system: a data-driven way for a map to declare exit
+      tiles that load a different zone at a specific spawn tile/facing
+      (extends `src/world/startingZone.ts`'s map format and
+      `WorldScene`'s tile/collision loading to support more than one
+      map). This is the mechanism only - Fernbrook Outpost's south gap
+      currently leads nowhere because nothing consumes it yet.
+- [ ] A second zone (new hand-laid map using the tile/prop catalogs, plus
+      its own wild-encounter tall-grass patches) connected to Fernbrook
+      Outpost's south exit via the transition system above.
+- [ ] Dialogue box UI system: a reusable scrolling text-box component
+      (own scene or an overlay usable from `WorldScene`) in the existing
+      dark-panel/monospace style (`src/ui/panel.ts`), advancing one
+      message at a time on A/Enter/click - the same interaction pattern
+      `BattleScene`'s message box already uses, factored out so NPCs,
+      signs, and story beats can all reuse it instead of each rebuilding
+      message-queue logic.
+- [ ] NPC entity system: place static NPCs on a zone map (sprite + facing
+      direction + a line or two of dialogue), block their tile like a
+      prop, and let the player interact with one by facing it and
+      pressing A, triggering the dialogue box above.
+- [ ] Make the Concord field office enterable: an interior scene/room
+      (small hand-laid indoor map) that the field-office prop's door tile
+      transitions into/out of via the zone-transition system, with at
+      least one NPC inside using the interaction system above.
+
+### Spawns & Encounters
+- [ ] Per-zone spawn tables: a data structure (e.g. per zone, a weighted
+      list of founder "species" presets - type/part combinations) plugged
+      into `src/data/wildEncounters.ts` so an encounter tile picks from
+      its zone's table instead of `createFounderGenome` producing a fully
+      random Fusion every time.
+- [ ] Persistent wild-Fusion world entities: place specific wild Fusion
+      instances on a zone map with their own alive/defeated state
+      (rendered on the map, not just rolled on step-in), so there's
+      something concrete for a respawn timer to act on. Battling one
+      removes it from the map instead of the current fresh-Fusion-per-
+      encounter behavior.
+- [ ] Global 2-minute respawn timer for the persistent wild-Fusion
+      entities above: a defeated/caught one reappears exactly 2 minutes
+      later (flat, no per-species/zone tuning per README).
+- [ ] Named-boss system (mechanism, not content): a way to hand-place a
+      unique Fusion on a zone map that always drops guaranteed special
+      loot on defeat and uses its own (longer than 2-minute, configurable
+      per boss) respawn timer, separate from the regular-mob system
+      above.
+- [ ] Design and place the first named boss (or two) for Fernbrook
+      Outpost using the system above: pick its Fusion build, its
+      guaranteed-loot table entry (rare part / guaranteed-dominant allele
+      / unique cosmetic variant per README), and its respawn timer value.
+- [ ] Capture flow: a "sample kit" item usable from the battle move menu
+      (alongside/instead of a move), a catch-rate formula scaled by the
+      wild Fusion's remaining HP%, status condition, and the kit's
+      strength (`src/battle/battleEngine.ts` has the HP/status state this
+      needs), and on success add the caught Fusion to the player's roster
+      (see Party management below) instead of the battle only ever ending
+      in win/loss/run.
+
+### Battling
+- [ ] Trainer-battle type: a data model for a trainer NPC (party of one+
+      Fusions) reusing the NPC interaction system to trigger a battle via
+      `BattleScene`, distinct from a wild encounter in that RUN AWAY isn't
+      offered (matching real trainer-battle conventions) and the intro/
+      outcome messages read as a trainer fight rather than "a wild Fusion
+      appeared."
+- [ ] Party roster data layer: extend `src/state/party.ts` from a single
+      auto-assigned Fusion to a real list of up to 6, with add (from
+      starter selection, capture, or hatching), remove/release, and
+      reorder operations that other systems (capture, breeding, starter
+      selection) can call.
+- [ ] In-battle switching: once the roster above holds more than one
+      Fusion, add a SWITCH option to `BattleScene`'s move menu and a
+      forced-switch prompt when the active Fusion faints instead of the
+      battle ending immediately in a loss.
+- [ ] A healing location or item (a "Fusion Center" equivalent - e.g. an
+      NPC/object in the field office that fully restores the active
+      Fusion's HP and clears status) so that losing a battle can
+      eventually stop being a free full-heal safety net once capture/
+      party stakes exist - `BattleScene.loseBattle` currently always
+      full-heals for exactly this reason.
+
+### Breeding UI & Progression
+- [ ] Fusion storage ("box") system: a place to keep Fusions beyond the
+      6-slot active roster (caught/bred Fusions exceeding party capacity
+      need somewhere to go), plus a simple browse/withdraw/deposit screen
+      in the existing panel UI style.
+- [ ] In-game breeding UI: a screen to pick two compatible Fusions (same
+      breeding group, per README) from the roster/storage above and
+      produce an egg by calling the existing `breed()` engine
+      (`src/genetics/breeding.ts`) - the engine itself is done and
+      tested, only the picking-two-parents UI and egg creation are
+      missing.
+- [ ] Egg/hatching flow: an egg item/entity holding a bred genome, a
+      hatch timer (steps walked or real time), and conversion into a
+      real `Fusion` added to the roster/storage on hatch, with at least a
+      simple on-screen notification when it happens.
+- [ ] Concord registry UI: a browse screen over `ConcordRegistry`
+      (`src/genetics/registry.ts`) listing discovered signatures and
+      their discovery counts, in the existing panel UI style.
+- [ ] First Bastion: a zone location with a signature-Fusion-specialist
+      trainer battle (using the trainer-battle system above) that sets a
+      story-progress flag on defeat, gating whatever content comes next.
+- [ ] First Chimera Nine story encounter: a scripted dialogue + trainer
+      battle beat (using the dialogue and trainer-battle systems above)
+      tied to a story flag, establishing the antagonist in-game rather
+      than only in README lore. Further story beats/Bastions are follow-
+      on tasks of the same shape once this one exists.
+
+### Persistence & Platform
+- [ ] Save/load via `localStorage`: serialize the player's position/zone,
+      appearance/name, roster + storage, inventory, registry, and story
+      flags into one save blob, wire real logic into the pause menu's
+      existing SAVE entry (`src/scenes/PauseMenuScene.ts`, currently
+      "Not available yet."), and load it back on boot when present.
+- [ ] Title screen / main menu scene shown before `WorldScene` boots:
+      New Game (starts character creation) and Continue (loads the save
+      above, only enabled/shown when one exists).
+- [ ] Starter item catalog: populate `src/data/items.ts` with a first
+      real batch of items (sample kits for the capture flow, a basic
+      healing item) and at least one way to obtain them in the world
+      (e.g. given at the field office, or a small shop/NPC).
+- [ ] Inventory grid interaction: once the catalog above is non-empty,
+      give `src/scenes/InventoryScene.ts` a D-pad-navigable cursor over
+      filled slots plus an A-button "use" action, matching the cursor
+      pattern `PauseMenuScene` already implements.
+
+### Art & Audio
+- [ ] Resolve the Tuxemon asset situation before shipping: either write
+      up a license-compliant redistribution/attribution story for the
+      exact CC BY-SA 4.0 files in `public/assets/` (see
+      `public/assets/CREDITS.md`), or commission/produce original
+      replacements for the world tiles/props/character art.
+- [ ] Additional world tiles/props: at minimum a sign, a fence, a second
+      building, and a basic indoor tileset (needed by the field-office
+      interior and second-zone tasks above, which currently have nothing
+      indoor to build with).
+- [ ] Background music: one overworld track and one battle track, looped,
+      with a mute/volume toggle somewhere in the UI (e.g. the pause menu).
+- [ ] Sound effects: menu move/confirm/back, a step sound, and battle hits/
+      faint/catch cues.
+
+### Engineering
 - [ ] **Manual step needed, not something a push can do**: in the
       repo's Settings → Pages, set Source to "Deploy from a branch" /
       `gh-pages` / root - only after the workflow has run at least once
