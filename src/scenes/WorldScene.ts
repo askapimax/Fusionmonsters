@@ -8,11 +8,12 @@ import {
   type FacingDirection,
 } from '../data/character';
 import { PROPS, type PropId } from '../data/props';
+import { ZONE_SPAWN_TABLES } from '../data/spawnTables';
 import { TILES, TILE_IDS, TILE_SIZE, type TileId } from '../data/tiles';
 import { generateWildFusion, rollForEncounter } from '../data/wildEncounters';
 import { mulberry32, randomSeed } from '../genetics/rng';
 import { touchControls } from '../input/touchControls';
-import { MAP_COLS, MAP_ROWS, SPAWN, STARTING_ZONE_GROUND, STARTING_ZONE_PROPS, ZONE_NAME } from '../world/startingZone';
+import { MAP_COLS, MAP_ROWS, SPAWN, STARTING_ZONE_GROUND, STARTING_ZONE_PROPS, ZONE_ID, ZONE_NAME } from '../world/startingZone';
 
 const MOVE_DURATION = 160;
 const WALK_ANIM_FRAME_RATE = 8;
@@ -188,14 +189,15 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** Pokemon-style random encounter: each step onto a tall-grass tile
-   * (`TILES[...].encounterZone`) has a flat chance to start a wild battle.
-   * See src/data/wildEncounters.ts for the odds and spawn logic. */
+   * (`TILES[...].encounterZone`) has a flat chance to start a wild battle
+   * against a Fusion whose type is biased by this zone's spawn table.
+   * See src/data/wildEncounters.ts and src/data/spawnTables.ts. */
   private maybeTriggerEncounter(col: number, row: number): void {
     const tileId: TileId = STARTING_ZONE_GROUND[row][col];
     if (!TILES[tileId].encounterZone) return;
     if (!rollForEncounter(mulberry32(randomSeed()))) return;
 
-    const wildFusion = generateWildFusion(mulberry32(randomSeed()));
+    const wildFusion = generateWildFusion(mulberry32(randomSeed()), ZONE_SPAWN_TABLES[ZONE_ID]);
     this.scene.pause();
     this.scene.launch('BattleScene', { wildFusion });
   }

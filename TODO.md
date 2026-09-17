@@ -115,10 +115,18 @@ reality.
       Fusion. Wired into `WorldScene.maybeTriggerEncounter`, called from
       the movement-tween's `onComplete` so it can never fire mid-step or
       while a menu/battle is already open.
-- [ ] Per-zone spawn tables (which Fusions can appear, with individual
-      spawn-probability weights — see README "Spawns & Named Bosses").
-      Right now any encounter tile in the one zone can produce *any*
-      random founder, with no bias by type/rarity/part.
+- [x] Per-zone spawn tables (`src/data/spawnTables.ts`,
+      `ZONE_SPAWN_TABLES`): each zone weights which primary types are
+      common vs. rare there (same weighted-random pattern the part
+      catalog uses for `rarityWeight`), passed through
+      `generateWildFusion`'s new `spawnTable` param into
+      `createFounderGenome`'s existing `forcedPrimaryType` option.
+      Fernbrook Outpost's table favors flora/aqua and makes
+      thermal/mineral/photon rare. Parts/traits/moves/stats are still
+      fully random within whichever type gets rolled — only the type is
+      zone-biased so far. Vitest suite in `spawnTables.test.ts` covers
+      the weighting and the fallback to a fully random type when no
+      table is given.
 - [ ] Global 2-minute respawn timer for regular mobs — moot until there's
       something zone-persistent to respawn; current wild Fusions are
       generated fresh per encounter and don't exist in the world otherwise.

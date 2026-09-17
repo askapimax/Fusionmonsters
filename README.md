@@ -235,15 +235,20 @@ single random-encounter roll per step:
   exact value TBD per boss) are not yet defined and need to be designed and
   tuned later.
 
-**First pass (implemented):** stepping onto a tall-grass tile
+**Implemented so far:** stepping onto a tall-grass tile
 (`TILES[...].encounterZone` in `src/data/tiles.ts`) has a flat 12% chance
 per step to start a battle (`src/data/wildEncounters.ts`,
 `WorldScene.maybeTriggerEncounter`) against one freshly-generated random
-founder Fusion. None of the spawn-table/named-boss/respawn-timer design
-above is wired up yet - every encounter tile in the one existing zone can
-currently produce *any* random Fusion with equal likelihood, and defeated
-wild Fusions don't persist in the world to respawn at all (they're
-generated fresh per encounter, not placed).
+founder Fusion. Per-zone spawn tables are wired up (`src/data/spawnTables.ts`,
+`ZONE_SPAWN_TABLES`): each zone weights which primary types are common vs.
+rare there, using the same weighted-random pattern as part `rarityWeight`.
+Fernbrook Outpost favors flora/aqua and makes thermal/mineral/photon rare
+finds. Parts/traits/moves/stats stay fully random within whichever type
+gets rolled - only the primary type is zone-biased so far, and it's still
+one table per zone rather than a per-species roster. Named bosses and the
+2-minute respawn timer aren't wired up yet, and defeated wild Fusions don't
+persist in the world to respawn at all (they're generated fresh per
+encounter, not placed).
 
 ## Breeding & Genetics
 

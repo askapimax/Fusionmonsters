@@ -1,4 +1,5 @@
 import type { PropPlacement } from '../data/props';
+import type { ZoneId } from '../data/spawnTables';
 import type { TileId } from '../data/tiles';
 
 /**
@@ -8,6 +9,7 @@ import type { TileId } from '../data/tiles';
  * tall-grass patches here are a first pass, not final level design.
  */
 
+export const ZONE_ID: ZoneId = 'fernbrook_outpost';
 export const ZONE_NAME = 'Fernbrook Outpost';
 export const MAP_COLS = 40;
 export const MAP_ROWS = 30;
