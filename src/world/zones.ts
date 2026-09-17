@@ -1,6 +1,7 @@
 import type { PropPlacement } from '../data/props';
 import type { ZoneId } from '../data/spawnTables';
 import type { TileId } from '../data/tiles';
+import * as fieldOfficeInterior from './fieldOfficeInterior';
 import * as routeOneStub from './routeOneStub';
 import * as fernbrookOutpost from './startingZone';
 import type { ZoneExit, ZoneSpawn } from './zoneTypes';
@@ -46,5 +47,17 @@ export const ZONES: Record<ZoneId, ZoneDef> = {
     ground: routeOneStub.ROUTE_ONE_STUB_GROUND,
     props: routeOneStub.ROUTE_ONE_STUB_PROPS,
     exits: routeOneStub.ZONE_EXITS,
+  },
+  // The field office's interior - see fieldOfficeInterior.ts's file-level
+  // comment (TODO "Make the Concord field office enterable").
+  field_office_interior: {
+    zoneId: fieldOfficeInterior.ZONE_ID,
+    zoneName: fieldOfficeInterior.ZONE_NAME,
+    cols: fieldOfficeInterior.MAP_COLS,
+    rows: fieldOfficeInterior.MAP_ROWS,
+    spawn: fieldOfficeInterior.SPAWN,
+    ground: fieldOfficeInterior.FIELD_OFFICE_INTERIOR_GROUND,
+    props: fieldOfficeInterior.FIELD_OFFICE_INTERIOR_PROPS,
+    exits: fieldOfficeInterior.ZONE_EXITS,
   },
 };

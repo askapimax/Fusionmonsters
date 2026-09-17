@@ -17,7 +17,7 @@ export interface SpawnTableEntry {
 
 export type SpawnTable = SpawnTableEntry[];
 
-export type ZoneId = 'fernbrook_outpost' | 'route_one_stub';
+export type ZoneId = 'fernbrook_outpost' | 'route_one_stub' | 'field_office_interior';
 
 export const ZONE_SPAWN_TABLES: Record<ZoneId, SpawnTable> = {
   // Fernbrook Outpost: open grass, tall-grass patches, and a pond - flora
@@ -44,6 +44,22 @@ export const ZONE_SPAWN_TABLES: Record<ZoneId, SpawnTable> = {
   // represented" invariant tested below; real per-zone tuning is part of
   // the separate "second zone" content TODO item, not this one.
   route_one_stub: [
+    { type: 'flora', weight: 10 },
+    { type: 'aqua', weight: 8 },
+    { type: 'aero', weight: 6 },
+    { type: 'toxin', weight: 4 },
+    { type: 'ferro', weight: 3 },
+    { type: 'volt', weight: 3 },
+    { type: 'mineral', weight: 2 },
+    { type: 'thermal', weight: 1 },
+    { type: 'photon', weight: 1 },
+  ],
+  // field_office_interior (TODO "Make the Concord field office enterable")
+  // is an indoor room with no tall-grass encounter tiles, so this table is
+  // never actually rolled against either - filled in identically to the
+  // two tables above purely to satisfy `Record<ZoneId, SpawnTable>` and the
+  // "every breedable type is represented" invariant tested below.
+  field_office_interior: [
     { type: 'flora', weight: 10 },
     { type: 'aqua', weight: 8 },
     { type: 'aero', weight: 6 },

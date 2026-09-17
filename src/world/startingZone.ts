@@ -19,17 +19,10 @@ export const MAP_ROWS = 30;
 
 export const SPAWN = { col: 20, row: 9 };
 
-/**
- * A "Fusion Center"-equivalent healing spot, placed just outside the field
- * office's door. The field office itself isn't enterable yet (no interior/
- * zone-transition system - see TODO.md), so this is a deliberate outdoor
- * scope-reduction rather than a real interior NPC: a single interactable
- * tile the player faces and presses A/Z on (see `WorldScene.checkInteraction`)
- * to fully restore their active Fusion's HP, the same effect
- * `BattleScene.loseBattle`'s free full-heal already grants on a loss. Move
- * this into a real field-office interior once that exists.
- */
-export const HEALING_SPOT = { col: 23, row: 7 };
+// The outdoor healing marker that used to live here (`HEALING_SPOT`, just
+// outside the field office's door) has moved inside now that the field
+// office is enterable (TODO "Make the Concord field office enterable") -
+// see `HEALING_SPOT` in `./fieldOfficeInterior.ts`.
 
 function buildGround(): TileId[][] {
   const map: TileId[][] = Array.from({ length: MAP_ROWS }, () =>
@@ -121,8 +114,9 @@ export const STARTING_ZONE_TRAINERS: TrainerPlacement[] = buildTrainers();
  * `WorldScene` renders it as a static sprite, blocks its tile like a prop,
  * and lets the player talk to it by facing it and pressing A/Z (see
  * `WorldScene.buildNpcs`/`maybeTalkToNpc`). Kept Fernbrook-only for now,
- * the same way `STARTING_ZONE_TRAINERS`/`HEALING_SPOT` above are - NPCs
- * aren't part of the generic `ZoneDef` shape yet (see `../world/zones.ts`).
+ * the same way `STARTING_ZONE_TRAINERS` above is - NPCs aren't part of the
+ * generic `ZoneDef` shape yet (see `../world/zones.ts`). This interface is
+ * also reused by `./fieldOfficeInterior.ts`'s own NPC placement list.
  */
 export interface NpcPlacement {
   npcId: NpcId;
@@ -132,8 +126,8 @@ export interface NpcPlacement {
 
 function buildNpcs(): NpcPlacement[] {
   return [
-    // Just southwest of the field office's door, opposite HEALING_SPOT -
-    // clear of the building footprint, the path, and the healing marker.
+    // Just southwest of the field office's door - clear of the building
+    // footprint and the path.
     { npcId: 'fernbrook_field_tech', col: 17, row: 7 },
   ];
 }
@@ -159,4 +153,13 @@ export const STARTING_ZONE_NPCS: NpcPlacement[] = buildNpcs();
 export const ZONE_EXITS: ZoneExit[] = [
   { col: 20, row: MAP_ROWS - 1, targetZoneId: 'route_one_stub', targetSpawn: { col: 5, row: 1 } },
   { col: 21, row: MAP_ROWS - 1, targetZoneId: 'route_one_stub', targetSpawn: { col: 6, row: 1 } },
+  // The field office's doorstep (TODO "Make the Concord field office
+  // enterable"): the field office prop occupies cols 18-21, rows 3-6 (see
+  // STARTING_ZONE_PROPS/PROPS.building), fully blocked, so there's no
+  // carved-out "door tile" in the footprint itself - instead the open grass
+  // tile immediately south of it acts as the doorstep. Stepping onto it
+  // transitions into the interior (`./fieldOfficeInterior.ts`), landing one
+  // tile in from its own door. Column 19 is clear of the existing NPC
+  // placement (17, 7) above.
+  { col: 19, row: 7, targetZoneId: 'field_office_interior', targetSpawn: { col: 3, row: 4 } },
 ];

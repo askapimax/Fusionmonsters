@@ -46,6 +46,20 @@ const NPC_LIST: NpcDef[] = [
       "Bram: Stay sharp out there - the Unraveling's been showing up closer to the Reach than anyone would like.",
     ],
   },
+  // Staffs the field office's interior (TODO "Make the Concord field office
+  // enterable") - see `FIELD_OFFICE_INTERIOR_NPCS` in
+  // `src/world/fieldOfficeInterior.ts`.
+  {
+    id: 'concord_field_registrar',
+    name: 'Registrar Wren',
+    facing: 'down',
+    tint: 0x8f6fbf,
+    lines: [
+      'Wren: Welcome in - this is Fernbrook Outpost\'s Concord field office.',
+      'Wren: That console against the wall doubles as our med-bay terminal - step up to it any time your Fusion needs patching up.',
+      "Wren: Keep logging your sightings out there. Every registry entry helps us track the Unraveling's spread.",
+    ],
+  },
 ];
 
 export const NPCS: Record<string, NpcDef> = Object.fromEntries(NPC_LIST.map((npc) => [npc.id, npc]));
