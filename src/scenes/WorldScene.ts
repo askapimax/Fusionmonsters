@@ -126,16 +126,42 @@ export class WorldScene extends Phaser.Scene {
     const worldHeight = this.zoneDef.rows * TILE_SIZE;
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
-    this.cameras.main.setZoom(3);
+    const cameraZoom = 3;
+    this.cameras.main.setZoom(cameraZoom);
 
+    // `setScrollFactor(0)` only cancels the main camera's *scroll* - a
+    // screen-space-fixed object is still run through the camera's zoom
+    // transform, which Phaser anchors on the camera's *center*
+    // (`centerX`/`centerY`), not its top-left corner (see
+    // `Camera.preRender`: it builds the render matrix via
+    // `applyITRS(centerX, centerY, ..., zoom, zoom)` then translates back
+    // by `-centerX/-centerY`). So at zoom 3 this text was rendering 3x too
+    // large and displaced far off the top-left of the canvas - not simply
+    // "3x too far from the origin", since the origin the zoom scales
+    // around isn't (0, 0) (see TODO.md "Battling" - HUD text invisible
+    // under zoom). `hudPoint` inverts exactly that transform: solving
+    // `screen = center + (world - center) * zoom` for `world` gives the
+    // position that lands back on the intended on-screen pixel once the
+    // real camera zoom is applied, and scaling the text by `1 / cameraZoom`
+    // cancels the zoom back out of its rendered size. Chosen over a second
+    // unzoomed UI camera to keep this fix contained to this one block while
+    // an unrelated zone-content change is also landing in `WorldScene.ts`
+    // this round.
+    const camera = this.cameras.main;
+    const hudPoint = (screenX: number, screenY: number) => ({
+      x: camera.centerX + (screenX - camera.centerX) / cameraZoom,
+      y: camera.centerY + (screenY - camera.centerY) / cameraZoom,
+    });
+    const hudPos = hudPoint(8, 8);
     this.add
       .text(
-        8,
-        8,
+        hudPos.x,
+        hudPos.y,
         `${this.zoneDef.zoneName}\nArrow keys / WASD, or the on-screen D-pad, to move\nEnter or Start to open the menu`,
         { fontSize: '11px', color: '#ffffff' },
       )
       .setScrollFactor(0)
+      .setScale(1 / cameraZoom)
       .setDepth(100);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
