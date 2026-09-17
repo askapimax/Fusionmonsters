@@ -1,6 +1,7 @@
 import type { PropPlacement } from '../data/props';
 import type { ZoneId } from '../data/spawnTables';
 import type { TileId } from '../data/tiles';
+import type { ZoneExit } from './zoneTypes';
 
 /**
  * The game's first zone: "Fernbrook Outpost", a small Concord waystation at
@@ -73,3 +74,24 @@ function buildProps(): PropPlacement[] {
 
 export const STARTING_ZONE_GROUND: TileId[][] = buildGround();
 export const STARTING_ZONE_PROPS: PropPlacement[] = buildProps();
+
+/**
+ * Zone-transition exits (TODO "Zone-transition system" - mechanism only).
+ * Additive to this file's existing map format: stepping onto one of these
+ * tiles sends the player to `targetZoneId` at `targetSpawn`. The south gap
+ * in the path (see `buildGround` above, which runs the path to
+ * `MAP_ROWS - 1` without anything beyond it) now leads to
+ * `route_one_stub`, a tiny placeholder zone that exists only to prove this
+ * mechanism works end to end - see `src/world/routeOneStub.ts` and
+ * `src/world/zones.ts`. The real second zone is a separate follow-on TODO
+ * item.
+ *
+ * The two exit tiles are the two path columns (20, 21) at the southern
+ * edge (row `MAP_ROWS - 1`). Target spawns land one tile *inside*
+ * route_one_stub's border rather than exactly on its own return exit, so
+ * walking south doesn't immediately bounce back north.
+ */
+export const ZONE_EXITS: ZoneExit[] = [
+  { col: 20, row: MAP_ROWS - 1, targetZoneId: 'route_one_stub', targetSpawn: { col: 5, row: 1 } },
+  { col: 21, row: MAP_ROWS - 1, targetZoneId: 'route_one_stub', targetSpawn: { col: 6, row: 1 } },
+];
