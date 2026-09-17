@@ -29,13 +29,25 @@
       #app {
         flex: 1 1 auto;
         min-height: 0;
-        display: flex;
-        justify-content: center;
-        /* Top-align rather than center: on tall/narrow screens FIT leaves
-           extra vertical space, and top-aligning keeps that gap next to
-           the control bar below instead of splitting it above and below
-           the game view. */
-        align-items: flex-start;
+        /* `position: relative` (not flexbox) on purpose: Phaser's Scale
+           Manager centers the canvas itself via CSS `margin-left` (see
+           `scale.autoCenter` in src/main.ts) and, when DOM Element game
+           objects are enabled (`dom.createContainer`), positions their
+           absolutely-positioned overlay container by copying that same
+           margin - it does not set `left`/`top` at all. A flex parent
+           with `justify-content: center` broke that: an absolutely
+           positioned child's CSS "static position" inside a flex
+           container is computed by centering *its own* (unscaled, 800px)
+           box in the flex line, not by tracking the canvas, which shifted
+           DOM elements (e.g. CharacterCreationScene's name `<input>`) far
+           off to the left on any viewport narrower than 800px. A plain
+           `position: relative` block container has no such static-
+           position quirk - an unpositioned absolute child simply starts
+           at (0, 0) in it, which then lines up with the canvas's own
+           margin-based offset the same way Phaser's own examples assume.
+           Top alignment (vs. centering) falls out for free this way too:
+           `margin-top` is 0 under `autoCenter: CENTER_HORIZONTALLY`. */
+        position: relative;
         overflow: hidden;
       }
 
