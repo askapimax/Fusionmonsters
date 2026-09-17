@@ -1,12 +1,23 @@
 import Phaser from 'phaser';
 import { attachTouchControls } from './input/touchControls';
 import { BattleScene } from './scenes/BattleScene';
+import { CatalogPreviewScene } from './scenes/CatalogPreviewScene';
 import { CharacterCreationScene } from './scenes/CharacterCreationScene';
 import { ConcordRegistryScene } from './scenes/ConcordRegistryScene';
 import { DialogueScene } from './scenes/DialogueScene';
 import { InventoryScene } from './scenes/InventoryScene';
 import { PauseMenuScene } from './scenes/PauseMenuScene';
 import { WorldScene } from './scenes/WorldScene';
+
+// Debug-only escape hatch: ?debug=catalog-preview boots straight into
+// CatalogPreviewScene (a visual proof of the catalog/breeding/render
+// pipeline) instead of the normal character-creation/world flow. Phaser
+// only auto-starts a scene array's first entry, so putting
+// CatalogPreviewScene there - instead of separately calling
+// `scene.start(...)` after the game boots - avoids leaving the normal boot
+// scene's DOM elements running underneath it. Nothing else references this
+// scene, so it's otherwise inert to a normal player.
+const debugCatalogPreview = new URLSearchParams(window.location.search).get('debug') === 'catalog-preview';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -29,10 +40,14 @@ new Phaser.Game({
     width: 800,
     height: 480,
   },
-  // CharacterCreationScene is first so Phaser auto-starts it instead of
-  // WorldScene - it hands off to WorldScene itself (`this.scene.start
-  // ('WorldScene')`) once the player confirms their appearance/name.
-  scene: [CharacterCreationScene, WorldScene, PauseMenuScene, InventoryScene, ConcordRegistryScene, BattleScene, DialogueScene],
+  // CharacterCreationScene is normally first so Phaser auto-starts it
+  // instead of WorldScene - it hands off to WorldScene itself
+  // (`this.scene.start('WorldScene')`) once the player confirms their
+  // appearance/name. CatalogPreviewScene swaps into that first slot only
+  // when the debug flag above is set.
+  scene: debugCatalogPreview
+    ? [CatalogPreviewScene, CharacterCreationScene, WorldScene, PauseMenuScene, InventoryScene, ConcordRegistryScene, BattleScene, DialogueScene]
+    : [CharacterCreationScene, WorldScene, PauseMenuScene, InventoryScene, ConcordRegistryScene, BattleScene, DialogueScene, CatalogPreviewScene],
 });
 
 attachTouchControls('touch-controls');
