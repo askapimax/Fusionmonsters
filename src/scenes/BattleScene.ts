@@ -19,12 +19,22 @@ import type { Fusion } from '../genetics/fusion';
 import { mulberry32, pickRandom, randomSeed, type RNG } from '../genetics/rng';
 import { buildCreatureSVG, svgToDataUrl } from '../render/compositeSprite';
 import { touchControls } from '../input/touchControls';
-import { addToRoster, getPlayerCurrentHp, getPlayerFusion, healPlayerFully, setPlayerCurrentHp } from '../state/party';
+import {
+  addToRoster,
+  getActiveSlotIndex,
+  getPlayerCurrentHp,
+  getPlayerFusion,
+  getRoster,
+  healPlayerFully,
+  setActiveSlot,
+  setPlayerCurrentHp,
+} from '../state/party';
 import { depositToStorage } from '../state/storage';
 import type { TrainerDef } from '../data/trainers';
 import { ITEMS_BY_ID } from '../data/items';
 import { consumeItem, hasItem } from '../state/inventory';
 import { drawPanel, UI_THEME } from '../ui/panel';
+import { viableSwitchIndices } from '../battle/partySwitching';
 
 const SAMPLE_KIT_ITEM_ID = 'sample_kit';
 
@@ -55,6 +65,11 @@ type BattlePhase = 'message' | 'menu' | 'busy';
 interface HpBarRefs {
   graphics: Phaser.GameObjects.Graphics;
   text: Phaser.GameObjects.Text;
+  /** The combatant's name label above the bar - stored (not just written
+   * once) so in-battle switching can retitle it in place when `this.player`
+   * is rebuilt for a new active Fusion, without tearing down/rebuilding the
+   * whole panel. See `rebuildPlayerVisuals` below. */
+  labelText: Phaser.GameObjects.Text;
   x: number;
   y: number;
   width: number;
@@ -112,10 +127,38 @@ export class BattleScene extends Phaser.Scene {
    * `confirmMenuSelection` - see the "Capture flow" addition below. */
   private sampleKitIndex: number | null = null;
   private runAwayIndex: number | null = null;
+  /** Index of 'SWITCH' within `menuItems`, or `null` when the roster has
+   * only the one Fusion (nothing to switch to) - see the "In-battle
+   * switching" additions below, which follow this exact same generalized-
+   * index pattern. */
+  private switchIndex: number | null = null;
 
   private phase: BattlePhase = 'message';
   private messageQueue: string[] = [];
   private onQueueDone: (() => void) | null = null;
+
+  // --- In-battle switching (TODO.md "Battling" - In-battle switching) ------
+  //
+  // Kept as its own clearly-delimited block of fields/methods rather than
+  // woven into the existing ones, since BattleScene.ts may also be touched
+  // by another agent this round (persistent wild-Fusion entities).
+
+  /** Roster slot indices that have fainted at some point during THIS battle.
+   * `src/state/party.ts`'s own `RosterSlot.currentHp` for the *active* slot
+   * can be stale until a switch (or the battle's end) writes it back - see
+   * `src/battle/partySwitching.ts`'s doc comment - so this is the scene's
+   * own belt-and-suspenders bookkeeping on top of that. Reset per battle in
+   * `create()`. */
+  private faintedSlots: Set<number> = new Set();
+  /** Non-null while the switch sub-picker (a temporary alternate render of
+   * the bottom message/menu panel, listing other roster members instead of
+   * moves) is showing in place of the normal move menu. 'voluntary' can be
+   * cancelled with B back to the move menu; 'forced' (the active Fusion
+   * just fainted) is mandatory - B does nothing. */
+  private switchPickerMode: 'voluntary' | 'forced' | null = null;
+  /** Maps a `menuItems`/`menuTexts` index to the roster index it represents
+   * while `switchPickerMode` is set (built fresh each time the picker opens). */
+  private switchPickerRosterIndices: number[] = [];
 
   constructor() {
     super('BattleScene');
@@ -134,6 +177,14 @@ export class BattleScene extends Phaser.Scene {
     this.rng = mulberry32(randomSeed());
     this.player = createCombatant(getPlayerFusion(), combatantLabel(getPlayerFusion(), true), getPlayerCurrentHp());
     this.wild = createCombatant(this.wildFusionInput, this.opponentLabel());
+
+    // BattleScene is a singleton Scene instance reused across every battle
+    // (Phaser calls init()/create() again on each `scene.launch`, but never
+    // re-runs the constructor), so per-battle switching state must be reset
+    // here explicitly rather than relying on class-field initializers.
+    this.faintedSlots = new Set();
+    this.switchPickerMode = null;
+    this.switchPickerRosterIndices = [];
 
     this.buildBackground();
     this.buildHud();
@@ -216,7 +267,7 @@ export class BattleScene extends Phaser.Scene {
 
   private buildInfoPanel(x: number, y: number, combatant: BattleCombatant): HpBarRefs {
     drawPanel(this, x, y, 320, 64).setDepth(10);
-    this.add
+    const labelText = this.add
       .text(x + 14, y + 8, combatant.label, { fontSize: '12px', color: UI_THEME.text, fontFamily: UI_THEME.fontFamily })
       .setDepth(11);
 
@@ -232,6 +283,7 @@ export class BattleScene extends Phaser.Scene {
     const bar: HpBarRefs = {
       graphics,
       text,
+      labelText,
       x: barX,
       y: barY,
       width: barWidth,
@@ -336,6 +388,11 @@ export class BattleScene extends Phaser.Scene {
 
   private pressB(): void {
     if (this.phase === 'message') this.advanceMessage();
+    // In-battle switching: B backs out of a *voluntary* SWITCH sub-picker
+    // back to the move menu, same as how B already closes other menus in
+    // this game. A forced switch (the active Fusion just fainted) has
+    // nothing to back out to, so B is a no-op there.
+    else if (this.phase === 'menu' && this.switchPickerMode === 'voluntary') this.cancelSwitchPicker();
   }
 
   private moveCursor(delta: number): void {
@@ -375,6 +432,9 @@ export class BattleScene extends Phaser.Scene {
     this.menuItems = [...this.playerMoves.map((m) => m.name)];
     this.sampleKitIndex = null;
     this.runAwayIndex = null;
+    this.switchIndex = null;
+    // Not in the middle of a switch pick anymore, if we ever were.
+    this.switchPickerMode = null;
     // Trainer battles don't offer SAMPLE KIT (you can't sample-kit a
     // trainer's Fusion) or RUN AWAY (matching real trainer-battle
     // conventions, per TODO.md) - the wild-encounter path is unchanged,
@@ -386,6 +446,15 @@ export class BattleScene extends Phaser.Scene {
       }
       this.runAwayIndex = this.menuItems.length;
       this.menuItems.push('RUN AWAY');
+    }
+    // SWITCH (TODO.md "Battling" - In-battle switching): offered in both
+    // wild and trainer battles (unlike SAMPLE KIT/RUN AWAY above) whenever
+    // there's more than one roster member - with only one, there's nothing
+    // to switch to, matching how SAMPLE KIT is only offered when the player
+    // actually holds one.
+    if (getRoster().length > 1) {
+      this.switchIndex = this.menuItems.length;
+      this.menuItems.push('SWITCH');
     }
     this.selectedIndex = 0;
     this.renderMenuItems();
@@ -434,6 +503,16 @@ export class BattleScene extends Phaser.Scene {
 
   private confirmMenuSelection(): void {
     const index = this.selectedIndex;
+
+    // In-battle switching: while the switch sub-picker is showing,
+    // confirming a selection means "switch to this roster member", not
+    // "use this move" - route there first, leaving everything below (the
+    // normal move menu's own confirm handling) untouched.
+    if (this.switchPickerMode !== null) {
+      this.confirmSwitchPickerSelection();
+      return;
+    }
+
     this.phase = 'busy';
     this.clearMenuItems();
 
@@ -445,6 +524,10 @@ export class BattleScene extends Phaser.Scene {
       this.attemptRun();
       return;
     }
+    if (this.switchIndex !== null && index === this.switchIndex) {
+      this.beginVoluntarySwitch();
+      return;
+    }
     this.resolveTurn(this.playerMoves[index]);
   }
 
@@ -452,6 +535,150 @@ export class BattleScene extends Phaser.Scene {
     // Wild encounters are low-stakes with no capture/party system yet, so
     // fleeing always succeeds rather than risking a frustrating dead end.
     this.say(['Got away safely!'], () => this.endBattle());
+  }
+
+  // --- In-battle switching (TODO.md "Battling" - In-battle switching) ------
+  //
+  // A clearly-delimited addition, mirroring the "Capture flow" block right
+  // below in shape: new methods slotting into the existing menu/index
+  // machinery via `switchIndex`/`switchPickerMode`, nothing above restructured.
+  //
+  // Voluntary vs. forced, and whether a voluntary switch costs a turn:
+  //  - Voluntary (the player picks SWITCH from the move menu): costs the
+  //    player their turn. Real games generally let the opponent act after a
+  //    deliberate switch, and letting it be "free" would make SWITCH a
+  //    strictly-safe way to stall/scout with no downside - the same
+  //    reasoning `attemptSampleKit` already documents for a failed capture.
+  //    `performSwitch` gives the wild/trainer side a real turn afterward via
+  //    `giveWildFreeTurn`, the exact same pipeline the failed-Sample-Kit
+  //    path already uses.
+  //  - Forced (the active Fusion just fainted): does NOT cost an extra turn
+  //    - the fainted Fusion already couldn't act this turn (it just used up
+  //    its own turn fainting, typically to the opponent's own attack), so
+  //    after picking a replacement the battle just continues normally via
+  //    the ordinary move menu. The single-Fusion-roster case still falls
+  //    straight through to the existing `loseBattle()` call, unchanged.
+
+  /** Entry point for the SWITCH move-menu option. If nobody else is able to
+   * battle (every other roster member already fainted this battle, or at
+   * 0 HP), says so and returns to the move menu without opening a picker or
+   * spending the player's turn - matching how other conditional options
+   * here (SAMPLE KIT/RUN AWAY) never proceed into a dead end. */
+  private beginVoluntarySwitch(): void {
+    const viable = viableSwitchIndices(getRoster(), getActiveSlotIndex(), this.faintedSlots);
+    if (viable.length === 0) {
+      this.say(['No other Fusion is able to battle!'], () => this.openMoveMenu());
+      return;
+    }
+    this.say(['Choose a Fusion to switch to.'], () => this.openSwitchPicker('voluntary', viable));
+  }
+
+  /** Called from `checkOutcomeOrContinue` when the player's active Fusion
+   * has fainted. Tries to switch first, and only falls through to an actual
+   * loss when nothing else is available - either because the roster only
+   * ever had the one Fusion (today's existing, unchanged behavior) or
+   * because every other member has already fainted this battle. */
+  private handlePlayerFaint(): void {
+    const activeIndex = getActiveSlotIndex();
+    if (activeIndex !== null) {
+      this.faintedSlots.add(activeIndex);
+    }
+
+    const viable = viableSwitchIndices(getRoster(), activeIndex, this.faintedSlots);
+    if (viable.length === 0) {
+      this.loseBattle();
+      return;
+    }
+
+    this.say([`${this.player.label} has no energy left!`], () => this.openSwitchPicker('forced', viable));
+  }
+
+  /** Renders the switch sub-picker: a temporary alternate render of the
+   * bottom message/menu panel (same dark-panel/monospace grid
+   * `renderMenuItems` already draws for moves) listing `viableIndices`'
+   * roster members instead of moves. `confirmMenuSelection` routes here via
+   * `switchPickerMode` instead of treating a selection as a move/SAMPLE
+   * KIT/RUN AWAY pick. */
+  private openSwitchPicker(mode: 'voluntary' | 'forced', viableIndices: number[]): void {
+    const roster = getRoster();
+    this.switchPickerMode = mode;
+    this.switchPickerRosterIndices = viableIndices;
+    this.phase = 'menu';
+    this.messageText.setText('');
+    this.menuItems = viableIndices.map((i) => {
+      const slot = roster[i];
+      const maxHp = Math.round(slot.fusion.phenotype.stats.hp);
+      return `${combatantLabel(slot.fusion, true)} (${Math.max(0, Math.round(slot.currentHp))}/${maxHp})`;
+    });
+    this.selectedIndex = 0;
+    this.renderMenuItems();
+  }
+
+  /** B while the *voluntary* picker is open: back out to the move menu
+   * without switching or spending the turn. Not reachable while a forced
+   * switch is up - see `pressB`. */
+  private cancelSwitchPicker(): void {
+    this.switchPickerMode = null;
+    this.switchPickerRosterIndices = [];
+    this.openMoveMenu();
+  }
+
+  /** A/confirm while the picker is open: resolves the selected grid index
+   * back to a roster index and performs the switch. */
+  private confirmSwitchPickerSelection(): void {
+    const rosterIndex = this.switchPickerRosterIndices[this.selectedIndex];
+    const isForced = this.switchPickerMode === 'forced';
+    this.switchPickerMode = null;
+    this.switchPickerRosterIndices = [];
+    this.phase = 'busy';
+    this.clearMenuItems();
+    this.performSwitch(rosterIndex, isForced);
+  }
+
+  /** Executes a switch to roster slot `rosterIndex`: persists the outgoing
+   * Fusion's current battle HP back to its roster slot (`setPlayerCurrentHp`
+   * only ever writes the *active* slot, so this has to happen before
+   * `setActiveSlot` moves the pointer away from it - a fainted outgoing
+   * Fusion just writes back the 0 it's already at), moves the active-slot
+   * pointer, and rebuilds `this.player`/`this.playerSprite`/`this.playerBar`
+   * for the incoming Fusion. `this.wild` is left completely untouched - a
+   * switch is a player-side-only event, never a "free turn" for the wild/
+   * trainer side to also change combatants. */
+  private performSwitch(rosterIndex: number, isForced: boolean): void {
+    setPlayerCurrentHp(this.player.currentHp);
+    setActiveSlot(rosterIndex);
+
+    const fusion = getPlayerFusion();
+    this.player = createCombatant(fusion, combatantLabel(fusion, true), getPlayerCurrentHp());
+    this.rebuildPlayerVisuals();
+
+    this.say([`Go, ${this.player.label}!`], () => {
+      if (isForced) {
+        this.openMoveMenu();
+      } else {
+        this.giveWildFreeTurn();
+      }
+    });
+  }
+
+  /** Rebuilds the player-side sprite/HP-bar/label in place for whatever
+   * `this.player` currently is, after a switch. Waits for the new Fusion's
+   * texture (generated from its genome, same as `buildCombatantSprites`)
+   * before swapping the sprite, so there's never a frame with no player
+   * sprite at all. */
+  private rebuildPlayerVisuals(): void {
+    const oldSprite = this.playerSprite;
+    const x = oldSprite.x;
+    const y = oldSprite.y;
+    this.ensureFusionTexture(this.player.fusion, (key) => {
+      oldSprite.destroy();
+      this.playerSprite = this.add.image(x, y, key).setDisplaySize(150, 150).setDepth(3).setFlipX(true);
+    });
+
+    this.playerBar.maxHp = this.player.maxHp;
+    this.playerBar.displayedHp = this.player.currentHp;
+    this.playerBar.labelText.setText(this.player.label);
+    this.drawHpBar(this.playerBar, this.player.currentHp);
   }
 
   // --- Capture flow (TODO.md "Spawns & Encounters" - Capture flow) ---------
@@ -598,7 +825,11 @@ export class BattleScene extends Phaser.Scene {
     if (isFainted(this.wild)) {
       this.winBattle();
     } else if (isFainted(this.player)) {
-      this.loseBattle();
+      // In-battle switching (TODO.md "Battling"): try to switch to another
+      // roster member first, instead of ending the battle immediately in a
+      // loss - see `handlePlayerFaint`. With a single-Fusion roster this
+      // falls straight through to the same `loseBattle()` call as before.
+      this.handlePlayerFaint();
     } else {
       this.openMoveMenu();
     }
