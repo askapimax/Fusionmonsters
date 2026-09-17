@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { attachTouchControls } from './input/touchControls';
 import { BattleScene } from './scenes/BattleScene';
+import { ConcordRegistryScene } from './scenes/ConcordRegistryScene';
 import { InventoryScene } from './scenes/InventoryScene';
 import { PauseMenuScene } from './scenes/PauseMenuScene';
 import { WorldScene } from './scenes/WorldScene';
@@ -21,7 +22,7 @@ new Phaser.Game({
     width: 800,
     height: 480,
   },
-  scene: [WorldScene, PauseMenuScene, InventoryScene, BattleScene],
+  scene: [WorldScene, PauseMenuScene, InventoryScene, ConcordRegistryScene, BattleScene],
 });
 
 attachTouchControls('touch-controls');

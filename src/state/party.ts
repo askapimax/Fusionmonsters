@@ -1,6 +1,7 @@
 import { createFounderGenome } from '../genetics/breeding';
 import { createFusion, type Fusion } from '../genetics/fusion';
 import { mulberry32, randomSeed } from '../genetics/rng';
+import { concordRegistry } from './registry';
 
 /**
  * The player's single battling Fusion. There's no starter-selection flow or
@@ -21,6 +22,7 @@ export function getPlayerFusion(): Fusion {
   if (!playerFusion) {
     playerFusion = createFusion(createFounderGenome(mulberry32(randomSeed())));
     playerCurrentHp = playerFusion.phenotype.stats.hp;
+    concordRegistry.register(playerFusion.genome, playerFusion.phenotype);
   }
   return playerFusion;
 }

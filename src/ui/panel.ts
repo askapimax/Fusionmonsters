@@ -28,11 +28,12 @@ export function drawPanel(scene: Phaser.Scene, x: number, y: number, width: numb
   return graphics;
 }
 
-export function drawSlot(scene: Phaser.Scene, x: number, y: number, size: number): Phaser.GameObjects.Graphics {
+/** `height` defaults to `width` for the common square-slot case (item grids); pass both for a wider row (e.g. a list entry). */
+export function drawSlot(scene: Phaser.Scene, x: number, y: number, width: number, height: number = width): Phaser.GameObjects.Graphics {
   const graphics = scene.add.graphics();
   graphics.fillStyle(UI_THEME.slotFill, 1);
-  graphics.fillRoundedRect(x, y, size, size, 6);
+  graphics.fillRoundedRect(x, y, width, height, 6);
   graphics.lineStyle(1, UI_THEME.slotBorder, 1);
-  graphics.strokeRoundedRect(x, y, size, size, 6);
+  graphics.strokeRoundedRect(x, y, width, height, 6);
   return graphics;
 }
