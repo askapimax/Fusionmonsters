@@ -35,9 +35,17 @@ describe('ITEMS', () => {
     }
   });
 
-  it('includes at least one healing item and one capture-placeholder item', () => {
+  it('includes at least one healing item and one capture item', () => {
     expect(ITEMS.some((item) => item.effect.kind === 'heal')).toBe(true);
-    expect(ITEMS.some((item) => item.effect.kind === 'placeholder')).toBe(true);
+    expect(ITEMS.some((item) => item.effect.kind === 'capture')).toBe(true);
+  });
+
+  it('gives every capture item a positive kit strength', () => {
+    for (const item of ITEMS) {
+      if (item.effect.kind === 'capture') {
+        expect(item.effect.strength).toBeGreaterThan(0);
+      }
+    }
   });
 });
 

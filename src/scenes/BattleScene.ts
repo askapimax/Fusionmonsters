@@ -4,6 +4,7 @@ import type { MoveDef } from '../data/moves';
 import {
   applyDamage,
   applyMoveEffect,
+  attemptCapture,
   computeDamage,
   createCombatant,
   determineTurnOrder,
@@ -18,9 +19,13 @@ import type { Fusion } from '../genetics/fusion';
 import { mulberry32, pickRandom, randomSeed, type RNG } from '../genetics/rng';
 import { buildCreatureSVG, svgToDataUrl } from '../render/compositeSprite';
 import { touchControls } from '../input/touchControls';
-import { getPlayerCurrentHp, getPlayerFusion, healPlayerFully, setPlayerCurrentHp } from '../state/party';
+import { addToRoster, getPlayerCurrentHp, getPlayerFusion, healPlayerFully, setPlayerCurrentHp } from '../state/party';
 import type { TrainerDef } from '../data/trainers';
+import { ITEMS_BY_ID } from '../data/items';
+import { consumeItem, hasItem } from '../state/inventory';
 import { drawPanel, UI_THEME } from '../ui/panel';
+
+const SAMPLE_KIT_ITEM_ID = 'sample_kit';
 
 /**
  * Launch data for BattleScene. Exactly one of `wildFusion`/`trainer` is
@@ -100,6 +105,12 @@ export class BattleScene extends Phaser.Scene {
   private menuTexts: Phaser.GameObjects.Text[] = [];
   private menuItems: string[] = [];
   private selectedIndex = 0;
+  /** Index of 'SAMPLE KIT'/'RUN AWAY' within `menuItems` for the current
+   * menu, or `null` when that option isn't offered this menu (trainer mode
+   * for both, or no Sample Kit held). Set in `openMoveMenu`, read in
+   * `confirmMenuSelection` - see the "Capture flow" addition below. */
+  private sampleKitIndex: number | null = null;
+  private runAwayIndex: number | null = null;
 
   private phase: BattlePhase = 'message';
   private messageQueue: string[] = [];
@@ -360,11 +371,21 @@ export class BattleScene extends Phaser.Scene {
     this.phase = 'menu';
     this.messageText.setText('');
     this.playerMoves = resolveMoves(this.player.fusion);
-    // Trainer battles don't offer RUN AWAY (matching real trainer-battle
-    // conventions, per TODO.md) - the wild-encounter path is unchanged.
-    this.menuItems = this.trainerInput
-      ? [...this.playerMoves.map((m) => m.name)]
-      : [...this.playerMoves.map((m) => m.name), 'RUN AWAY'];
+    this.menuItems = [...this.playerMoves.map((m) => m.name)];
+    this.sampleKitIndex = null;
+    this.runAwayIndex = null;
+    // Trainer battles don't offer SAMPLE KIT (you can't sample-kit a
+    // trainer's Fusion) or RUN AWAY (matching real trainer-battle
+    // conventions, per TODO.md) - the wild-encounter path is unchanged,
+    // except SAMPLE KIT is now also omitted when the player has none.
+    if (!this.trainerInput) {
+      if (hasItem(SAMPLE_KIT_ITEM_ID)) {
+        this.sampleKitIndex = this.menuItems.length;
+        this.menuItems.push('SAMPLE KIT');
+      }
+      this.runAwayIndex = this.menuItems.length;
+      this.menuItems.push('RUN AWAY');
+    }
     this.selectedIndex = 0;
     this.renderMenuItems();
   }
@@ -415,7 +436,11 @@ export class BattleScene extends Phaser.Scene {
     this.phase = 'busy';
     this.clearMenuItems();
 
-    if (!this.trainerInput && index === this.playerMoves.length) {
+    if (this.sampleKitIndex !== null && index === this.sampleKitIndex) {
+      this.attemptSampleKit();
+      return;
+    }
+    if (this.runAwayIndex !== null && index === this.runAwayIndex) {
       this.attemptRun();
       return;
     }
@@ -426,6 +451,65 @@ export class BattleScene extends Phaser.Scene {
     // Wild encounters are low-stakes with no capture/party system yet, so
     // fleeing always succeeds rather than risking a frustrating dead end.
     this.say(['Got away safely!'], () => this.endBattle());
+  }
+
+  // --- Capture flow (TODO.md "Spawns & Encounters" - Capture flow) ---------
+  //
+  // A clearly-delimited addition on top of the existing move/RUN AWAY
+  // handling above rather than a restructuring of it: SAMPLE KIT slots into
+  // the same menu/index machinery via `sampleKitIndex`, and everything below
+  // is new. Only reachable in wild encounters (never trainer mode, see
+  // `openMoveMenu`) and only when the player actually holds a kit.
+
+  /** Uses one Sample Kit: consumes it, rolls the catch, and branches on the
+   * result. A successful catch adds the wild Fusion to the roster and ends
+   * the battle (or, if the roster is already full, degrades gracefully -
+   * see `addToRoster`'s doc comment - by reporting the roster is full and
+   * letting the battle continue rather than crashing or silently discarding
+   * the Fusion; a real "release one?" prompt is future Fusion-storage work).
+   * A failed catch ("It broke free!") gives the wild Fusion one free turn
+   * (chosen over just reopening the move menu, since the wild Fusion
+   * otherwise gets a completely free defensive action whenever the player
+   * throws a kit, which would make spamming SAMPLE KIT strictly safer than
+   * attacking - `giveWildFreeTurn` below reuses the exact same
+   * `executeMove`/`runEndOfTurnStatus` pipeline a normal move turn uses, so
+   * status damage/paralysis/fainting all behave identically to a real turn). */
+  private attemptSampleKit(): void {
+    const kit = ITEMS_BY_ID[SAMPLE_KIT_ITEM_ID];
+    const kitStrength = kit && kit.effect.kind === 'capture' ? kit.effect.strength : 1;
+    consumeItem(SAMPLE_KIT_ITEM_ID);
+
+    this.say(['You used a Sample Kit!'], () => {
+      const caught = attemptCapture(this.wild, kitStrength, this.rng);
+      if (!caught) {
+        this.say(['It broke free!'], () => this.giveWildFreeTurn());
+        return;
+      }
+
+      const added = addToRoster(this.wild.fusion);
+      if (added) {
+        this.say([`Gotcha! ${this.wild.label} was added to your roster!`], () => this.endBattle());
+      } else {
+        // Roster is already at MAX_ROSTER_SIZE (src/state/party.ts) - no
+        // Fusion-storage system exists yet to send an overflow catch to
+        // (see TODO.md's "Fusion storage" item), so rather than drop the
+        // catch silently or crash, report it and let the battle continue.
+        this.say(
+          [`Gotcha! ${this.wild.label} was caught...`, 'But your roster is full - it could not be secured!'],
+          () => this.openMoveMenu(),
+        );
+      }
+    });
+  }
+
+  /** Gives the wild Fusion one action using the same move-execution and
+   * end-of-turn-status pipeline `resolveTurn` uses for a normal exchange,
+   * just without a matching player move (the player's "turn" was spent on
+   * the failed capture attempt instead). */
+  private giveWildFreeTurn(): void {
+    const wildMoves = resolveMoves(this.wild.fusion);
+    const wildMove = pickRandom(wildMoves, this.rng);
+    this.executeMove(this.wild, this.player, wildMove, () => this.runEndOfTurnStatus());
   }
 
   // --- Turn resolution -----------------------------------------------------

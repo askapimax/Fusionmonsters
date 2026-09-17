@@ -1,16 +1,17 @@
 /**
  * Item catalog. A first real pass - small and deliberately not a full
  * economy (see TODO.md's "Persistence & Platform" section). Two healing
- * items, one status-cure item, and one honest placeholder for the
- * not-yet-built capture flow. `src/scenes/InventoryScene.ts` reads this
- * catalog + the player's inventory (`src/state/inventory.ts`) to render
- * the bag grid.
+ * items, one status-cure item, and a Sample Kit that now really does drive
+ * the capture flow (`BattleScene`'s SAMPLE KIT move-menu option, catch-rate
+ * math in `src/battle/battleEngine.ts`). `src/scenes/InventoryScene.ts`
+ * reads this catalog + the player's inventory (`src/state/inventory.ts`) to
+ * render the bag grid.
  *
- * None of these items can actually be *used* yet - there's no "use item"
- * system in battle or the overworld (that's separate future work, same as
- * capture). Selecting a slot in the inventory just shows the item's name
- * and description, like a real Pokemon bag's info line, rather than
- * pretending to apply an effect that doesn't exist.
+ * The heal/cure items still can't actually be *used* outside the inventory
+ * screen yet - there's no "use item" system for them in battle or the
+ * overworld (separate future work). Selecting one there just shows its name
+ * and description. The Sample Kit is the one exception: it's consumed from
+ * `BattleScene`'s move menu, not from here.
  */
 
 export type ItemEffect =
@@ -29,8 +30,15 @@ export type ItemEffect =
    * anything yet - there's no way to apply an item mid-battle.
    */
   | { kind: 'cure'; statuses: Array<'burn' | 'poison' | 'paralysis'> }
-  /** Explicitly does nothing yet - a placeholder for unbuilt game systems. */
-  | { kind: 'placeholder' };
+  /**
+   * Marks an item as a capture device usable from the battle move menu
+   * against a wild Fusion (never a trainer's). `strength` feeds directly
+   * into `computeCatchChance`'s `kitStrength` multiplier
+   * (`src/battle/battleEngine.ts`) - 1.0 is a baseline Sample Kit; a future
+   * stronger/weaker kit variant can just use a different number here
+   * without touching the catch-rate formula itself.
+   */
+  | { kind: 'capture'; strength: number };
 
 export interface ItemDef {
   id: string;
@@ -65,8 +73,8 @@ export const ITEMS: ItemDef[] = [
     id: 'sample_kit',
     name: 'Sample Kit',
     description:
-      "A Concord-issued kit for field-sampling a weakened wild Fusion. Doesn't do anything yet - the capture flow hasn't been built (see TODO.md).",
-    effect: { kind: 'placeholder' },
+      "A Concord-issued kit for field-sampling a weakened wild Fusion. Usable from the battle move menu against a wild Fusion (not a trainer's) - the lower its remaining HP and the more destabilized its condition, the better the odds of a successful sample.",
+    effect: { kind: 'capture', strength: 1 },
   },
 ];
 
