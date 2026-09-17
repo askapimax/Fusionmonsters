@@ -5,7 +5,7 @@ import { drawPanel, UI_THEME } from '../ui/panel';
 const PANEL_X = 560;
 const PANEL_Y = 40;
 const PANEL_WIDTH = 200;
-const PANEL_HEIGHT = 218;
+const PANEL_HEIGHT = 252;
 const OPTION_START_Y = PANEL_Y + 28;
 const OPTION_SPACING = 34;
 
@@ -18,6 +18,7 @@ const OPTIONS: MenuOption[] = [
   { label: 'INVENTORY', action: (scene) => scene.openInventory() },
   { label: 'REGISTRY', action: (scene) => scene.openRegistry() },
   { label: 'STORAGE', action: (scene) => scene.openStorage() },
+  { label: 'BREED', action: (scene) => scene.openBreeding() },
   { label: 'SAVE', action: (scene) => scene.showSaveNotice() },
   { label: 'CLOSE', action: (scene) => scene.closeMenu() },
 ];
@@ -122,6 +123,11 @@ export class PauseMenuScene extends Phaser.Scene {
   openStorage(): void {
     this.scene.stop();
     this.scene.launch('StorageScene');
+  }
+
+  openBreeding(): void {
+    this.scene.stop();
+    this.scene.launch('BreedingScene');
   }
 
   showSaveNotice(): void {

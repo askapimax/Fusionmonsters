@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { attachTouchControls } from './input/touchControls';
 import { BattleScene } from './scenes/BattleScene';
+import { BreedingScene } from './scenes/BreedingScene';
 import { CatalogPreviewScene } from './scenes/CatalogPreviewScene';
 import { CharacterCreationScene } from './scenes/CharacterCreationScene';
 import { ConcordRegistryScene } from './scenes/ConcordRegistryScene';
@@ -57,6 +58,7 @@ new Phaser.Game({
         InventoryScene,
         ConcordRegistryScene,
         StorageScene,
+        BreedingScene,
         BattleScene,
         DialogueScene,
       ]
@@ -68,6 +70,7 @@ new Phaser.Game({
         InventoryScene,
         ConcordRegistryScene,
         StorageScene,
+        BreedingScene,
         BattleScene,
         DialogueScene,
         CatalogPreviewScene,
