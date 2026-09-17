@@ -129,7 +129,7 @@ than just described here - see `src/world/startingZone.ts` and
   view), so this works on both phone and desktop viewports.
 - A Game Boy-style Start button sits next to the D-pad (also bound to
   Enter on keyboard) and opens a pause menu (`src/scenes/PauseMenuScene.ts`):
-  INVENTORY, SAVE, CLOSE. It's properly D-pad-navigable, not just
+  INVENTORY, REGISTRY, SAVE, CLOSE. It's properly D-pad-navigable, not just
   clickable: Up/Down (arrow keys or the D-pad) move a `>` cursor between
   options, A (Z key or the on-screen A button) confirms the highlighted
   one, B (X key or the on-screen B button) backs out and closes the menu -
@@ -140,14 +140,24 @@ than just described here - see `src/world/startingZone.ts` and
   yet." notice - see TODO.md.
 - INVENTORY opens `src/scenes/InventoryScene.ts`: a Pokemon-bag-style
   grid of item slots, in the same dark-panel/monospace UI style as the
-  pause menu (`src/ui/panel.ts`). It's real, data-driven UI, not a
-  placeholder screen - it reads from `src/data/items.ts` (the item
-  catalog) and `src/state/inventory.ts` (what the player is carrying),
-  both intentionally empty for now, so every slot renders empty rather
-  than the screen faking a populated bag. Adding real items later is a
-  data change, not a UI rebuild. B/X closes it (matching the pause menu);
-  there's no cursor to move with A/Up/Down yet since an empty grid has
-  nothing to select.
+  pause menu (`src/ui/panel.ts`). It's real, data-driven UI backed by a
+  real (if still small) item catalog (`src/data/items.ts`: two heal items,
+  a status-cure item, and an inert Sample Kit placeholder for the
+  not-yet-built capture flow) and a seeded starting inventory
+  (`src/state/inventory.ts`). It's D-pad-navigable like the pause menu:
+  Up/Down/Left/Right move a highlighted cursor around the grid (clamped,
+  not wrapped, at the edges), A/Enter/Z shows the selected item's name and
+  description, B/X closes it. There's no "use item" system yet (in battle
+  or the overworld) - selecting an item is informational only for now.
+- REGISTRY opens `src/scenes/ConcordRegistryScene.ts`: a scrollable list
+  of every distinct Fusion signature discovered so far (see "The Concord
+  registry" under Progression below), same dark-panel/monospace style and
+  open/close conventions as Inventory. The registry
+  (`src/state/registry.ts`) has two writers today: every wild encounter
+  (`WorldScene.maybeTriggerEncounter`) and the player's own auto-assigned
+  Fusion (`src/state/party.ts`) both register into it; bred offspring will
+  too once the in-game breeding UI exists. Registry state is in-memory
+  only for now (resets on reload) until Save/load lands.
 
 Run it: `npm install && npm run dev`.
 

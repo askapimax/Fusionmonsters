@@ -180,9 +180,44 @@ reality.
 
 ### Breeding UI & Progression
 - [ ] In-game breeding UI (pick two compatible Fusions, produce an egg,
-      hatch into a new Fusion using the existing `breed()` engine).
+      hatch into a new Fusion using the existing `breed()` engine). **When
+      this lands, wire its output into `concordRegistry.register(...)`
+      too** (see below) - bred offspring don't register yet since this
+      doesn't exist.
 - [ ] Egg/hatching flow and timing.
-- [ ] Concord registry UI (browse discovered signatures/species).
+- [x] Concord registry UI (`src/scenes/ConcordRegistryScene.ts`): browses
+      every distinct signature discovered so far, in the same dark-panel/
+      monospace style as `InventoryScene` (reuses `drawPanel`/`drawSlot`/
+      `UI_THEME`) - a scrollable list of rows (type(s), part names,
+      `timesDiscovered`), a running "N signatures discovered" count, and
+      the same empty-state message when nothing's been found yet. Opens
+      from a new REGISTRY entry in the pause menu
+      (`src/scenes/PauseMenuScene.ts`). The registry itself is now a real
+      app-wide singleton (`src/state/registry.ts`, `concordRegistry`,
+      mirroring the `party.ts`/`inventory.ts` singleton pattern) with two
+      writers: `WorldScene.maybeTriggerEncounter` registers every wild
+      sighting, and `party.ts#getPlayerFusion` registers the player's own
+      Fusion the first time it's assigned. `ConcordRegistry` itself
+      (`src/genetics/registry.ts`) is unchanged; `CatalogPreviewScene`
+      still uses its own separate throwaway instance for its debug demo.
+      Verified end to end via headless browser: walked into tall grass
+      until a wild encounter fired, ran away, opened the registry and
+      confirmed it showed "2 signatures discovered" (the wild sighting +
+      the player's own Fusion). Follow-ups below.
+- [ ] Registry: no per-entry drill-down/cursor yet (Up/Down only scrolls
+      the list) - fine while entries are short, but add a
+      cursor + confirm affordance if a future "view full stats/moves for
+      this signature" detail screen is wanted.
+- [ ] Registry: no sorting/filtering (e.g. by type) yet - revisit once the
+      discovered-signature list gets long.
+- [ ] Registry: state is in-memory only, same as `party.ts`/`inventory.ts`
+      - resets on page reload until Save/load (below) lands and persists
+      it too.
+- [ ] Registry: currently registers on every wild *sighting* (each
+      encounter roll), not on catch, since there's no capture system yet
+      (see "Wild-encounter → capture flow" above). Worth revisiting
+      whether sight-based or catch-based registration is the right call
+      once capture lands.
 - [ ] Bastion structure: regional gym-equivalents, specialist battles,
       story gating.
 - [ ] Story content: Chimera Nine encounters, the Unraveling plot beats.
@@ -193,12 +228,34 @@ reality.
       it currently just shows "Not available yet." and needs real
       save-state logic wired in.
 - [ ] Decide on and build the game's main menu / UI shell.
-- [ ] Actual items in `src/data/items.ts` and ways to obtain them - the
-      inventory screen is built and correctly renders whatever's there,
-      but nothing populates it yet. Once there are items, give the
-      inventory grid the same D-pad cursor + A/B handling the pause menu
-      has (`src/scenes/InventoryScene.ts` only has a B-button back action
-      so far - there's nothing to move a cursor between yet).
+- [x] Actual items in `src/data/items.ts` and a real starting inventory:
+      a small first-pass catalog (`src/data/items.ts`) - Verdant Salve and
+      Concord Stim-Canister (heal items, `healFraction` 0.3/0.6, same
+      fraction-of-max-HP unit `moveEffects.ts`'s `verdant_regrowth` heal
+      already uses), Neutralizing Draught (cures burn/poison/paralysis,
+      the same status ids the battle engine uses), and a Sample Kit
+      explicitly labeled as an inert placeholder for the not-yet-built
+      capture flow. `playerInventory` (`src/state/inventory.ts`) is now
+      seeded with a small starting kit by default, so the bag is
+      genuinely populated rather than always empty. `InventoryScene` got
+      the same D-pad cursor + A/B handling the pause menu has, adapted to
+      a 2D grid: Up/Down/Left/Right move a highlighted cursor (clamped,
+      not wrapped, at the grid edges), A/Enter/Z shows the selected
+      item's name + description in the panel. `src/data/items.test.ts`
+      covers catalog integrity and the starting kit. Verified end to end
+      via headless browser (real items render with quantities, cursor
+      moves correctly, confirming shows the description text, closing
+      returns to the world cleanly). Follow-ups below.
+- [ ] Items: no way to actually *use*/consume an item yet, in battle or
+      the overworld - confirming a slot only shows info text. A real
+      "use item" system (apply heal/cure effects, decrement quantity)
+      is separate future work.
+- [ ] Items: no acquisition system beyond the fixed starting kit - no
+      shop, NPCs, or loot drops exist yet (falls out of the NPCs/world
+      TODO above once that lands).
+- [ ] Items: heal fractions (0.3 / 0.6) are placeholder balance chosen for
+      consistency with the one existing move-heal value, not tuned
+      against a real economy.
 
 ### Art & Audio
 - [x] Re-polished the procedural Fusion-part generator (`pixelArt.ts`):
@@ -231,5 +288,23 @@ reality.
       repo's Settings → Pages, set Source to "Deploy from a branch" /
       `gh-pages` / root - only after the workflow has run at least once
       (it creates the branch).
-- [ ] Code-split the Phaser bundle (currently a single ~1.5MB chunk per
-      `npm run build`; fine for now, revisit before shipping).
+- [x] Code-split the Phaser bundle: `vite.config.ts` now routes Phaser
+      into its own `manualChunks` vendor chunk, separate from app code.
+      App code dropped from ~1.52MB to ~50KB (a ~30x reduction) and can
+      now be redeployed/cached independently of the Phaser vendor chunk.
+      Config-only change - no source files touched. The Phaser vendor
+      chunk itself (~1.48MB) still trips Vite's 500kB warning, which is
+      inherent to the library and not something further config-only
+      splitting addresses. Verified: `npm run build` output inspected
+      before/after, typecheck/tests/build all still pass after merge.
+- [ ] Lazy-load non-initial scenes (`PauseMenuScene`, `InventoryScene`,
+      `BattleScene`, `ConcordRegistryScene`) via dynamic `import()` in
+      `src/main.ts` once it isn't being concurrently edited elsewhere -
+      the app chunk still bundles all scenes eagerly even though only
+      `WorldScene` is needed at boot. Needs real `npm run dev` + manual
+      scene-launch verification before landing, not just a code read.
+- [ ] `src/scenes/CatalogPreviewScene.ts` (the debug catalog→genome→
+      breeding→phenotype→texture pipeline scene) is fully built but not
+      referenced anywhere in `src/main.ts` - dead code from the bundle's
+      perspective. Either wire it in behind a debug flag/route or remove
+      it.
