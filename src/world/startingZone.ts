@@ -135,6 +135,39 @@ function buildNpcs(): NpcPlacement[] {
 export const STARTING_ZONE_NPCS: NpcPlacement[] = buildNpcs();
 
 /**
+ * Persistent wild-Fusion world-entity placements (TODO.md "Spawns &
+ * Encounters" - Persistent wild-Fusion world entities / Global 2-minute
+ * respawn timer). Each entry fixes a spot on the map where a specific wild
+ * Fusion (generated once and kept stable across its respawns - see
+ * `src/world/wildFusionState.ts`) stands, rendered as its own composited
+ * sprite via `WorldScene.buildWildFusions`, rather than the per-step random
+ * roll tall-grass tiles already do. `id` keys that persistent state, so
+ * don't reuse or rename an id once placed (it'd re-roll a fresh Fusion and
+ * lose the old one's alive/defeated state). Kept Fernbrook-only for now,
+ * the same way `STARTING_ZONE_TRAINERS`/`HEALING_SPOT`/`STARTING_ZONE_NPCS`
+ * above are - not part of the generic `ZoneDef` shape yet.
+ */
+export interface WildFusionPlacement {
+  id: string;
+  col: number;
+  row: number;
+}
+
+function buildWildFusionPlacements(): WildFusionPlacement[] {
+  return [
+    // Three spots on open grass, checked against the path (cols 20-21),
+    // the pond (rows 8-9, cols 30-33), all three tall-grass patches, the
+    // field office's 4x4 footprint, every tree's 2x2 footprint, and the
+    // healing spot/trainer/NPC placements above - clear of all of them.
+    { id: 'fernbrook_wild_1', col: 13, row: 20 },
+    { id: 'fernbrook_wild_2', col: 33, row: 20 },
+    { id: 'fernbrook_wild_3', col: 8, row: 25 },
+  ];
+}
+
+export const STARTING_ZONE_WILD_FUSIONS: WildFusionPlacement[] = buildWildFusionPlacements();
+
+/**
  * Zone-transition exits (TODO "Zone-transition system" - mechanism only).
  * Additive to this file's existing map format: stepping onto one of these
  * tiles sends the player to `targetZoneId` at `targetSpawn`. The south gap

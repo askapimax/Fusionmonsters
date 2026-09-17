@@ -47,15 +47,28 @@ const SAMPLE_KIT_ITEM_ID = 'sample_kit';
  *    type) - no RUN AWAY (matching real trainer-battle conventions), and
  *    intro/outcome messages read as a trainer fight. Only `trainer.party[0]`
  *    is battled - multi-Fusion party switching is out of scope for now.
+ *
+ * `onDefeatedOrCaptured` (TODO.md "Spawns & Encounters" - Persistent
+ * wild-Fusion world entities): an optional outcome signal back to whoever
+ * launched this battle, called exactly once, only when the wild Fusion was
+ * actually won against or successfully caught - never on a run or a loss,
+ * both of which leave it exactly as it was. `WorldScene` passes this when
+ * the wild Fusion being battled is a persistent placement (not a random
+ * tall-grass encounter, which passes nothing here), so it can mark that
+ * placement defeated and start its respawn timer. A live function works
+ * fine through `scene.launch(key, data)` - Phaser passes launch data by
+ * reference, not serialized.
  */
 export interface WildBattleStartData {
   wildFusion: Fusion;
   trainer?: undefined;
+  onDefeatedOrCaptured?: () => void;
 }
 
 export interface TrainerBattleStartData {
   trainer: TrainerDef;
   wildFusion?: undefined;
+  onDefeatedOrCaptured?: () => void;
 }
 
 export type BattleStartData = WildBattleStartData | TrainerBattleStartData;
@@ -105,6 +118,9 @@ export class BattleScene extends Phaser.Scene {
   private wildFusionInput!: Fusion;
   /** Non-null in trainer-battle mode; null for the ordinary wild-encounter path. */
   private trainerInput: TrainerDef | null = null;
+  /** See `WildBattleStartData.onDefeatedOrCaptured` above - null unless the
+   * launcher passed one (only persistent wild-Fusion placements do). */
+  private onDefeatedOrCaptured: (() => void) | null = null;
   private rng: RNG = mulberry32(randomSeed());
 
   private player!: BattleCombatant;
@@ -171,6 +187,7 @@ export class BattleScene extends Phaser.Scene {
     // it as "the wild side" so the existing wild-encounter path is
     // untouched when trainerInput is null.
     this.wildFusionInput = this.trainerInput ? this.trainerInput.party[0] : (data.wildFusion as Fusion);
+    this.onDefeatedOrCaptured = data.onDefeatedOrCaptured ?? null;
   }
 
   create(): void {
@@ -714,6 +731,7 @@ export class BattleScene extends Phaser.Scene {
         return;
       }
 
+      this.onDefeatedOrCaptured?.();
       const added = addToRoster(this.wild.fusion);
       if (added) {
         this.say([`Gotcha! ${this.wild.label} was added to your roster!`], () => this.endBattle());
@@ -837,6 +855,7 @@ export class BattleScene extends Phaser.Scene {
 
   private winBattle(): void {
     setPlayerCurrentHp(this.player.currentHp);
+    this.onDefeatedOrCaptured?.();
     const message = this.trainerInput ? `You defeated ${this.trainerInput.name}!` : 'You won the battle!';
     this.say([message], () => this.endBattle());
   }

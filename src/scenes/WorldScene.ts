@@ -14,20 +14,36 @@ import { ZONE_SPAWN_TABLES, type ZoneId } from '../data/spawnTables';
 import { TILES, TILE_IDS, TILE_SIZE, type TileId } from '../data/tiles';
 import { TRAINERS } from '../data/trainers';
 import { generateWildFusion, rollForEncounter } from '../data/wildEncounters';
+import type { Fusion } from '../genetics/fusion';
 import { mulberry32, randomSeed } from '../genetics/rng';
 import { touchControls } from '../input/touchControls';
+import { buildCreatureSVG, svgToDataUrl } from '../render/compositeSprite';
 import { healPlayerFully } from '../state/party';
 import { getPlayerAppearance } from '../state/player';
 import { concordRegistry } from '../state/registry';
 import { setWorldPosition } from '../state/worldPosition';
 import { UI_THEME } from '../ui/panel';
+import type { BattleStartData } from './BattleScene';
 import type { DialogueStartData } from './DialogueScene';
 import {
   FIELD_OFFICE_INTERIOR_NPCS,
   HEALING_SPOT as INTERIOR_HEALING_SPOT,
   ZONE_ID as FIELD_OFFICE_INTERIOR_ZONE_ID,
 } from '../world/fieldOfficeInterior';
-import { STARTING_ZONE_NPCS, STARTING_ZONE_TRAINERS, ZONE_ID, type NpcPlacement } from '../world/startingZone';
+import {
+  STARTING_ZONE_NPCS,
+  STARTING_ZONE_TRAINERS,
+  STARTING_ZONE_WILD_FUSIONS,
+  ZONE_ID,
+  type NpcPlacement,
+  type WildFusionPlacement,
+} from '../world/startingZone';
+import {
+  getWildFusionRespawnDelayMs,
+  getWildFusionState,
+  isWildFusionAlive,
+  markWildFusionDefeated,
+} from '../world/wildFusionState';
 import { ZONES, type ZoneDef } from '../world/zones';
 import type { ZoneSpawn } from '../world/zoneTypes';
 
@@ -67,6 +83,12 @@ export class WorldScene extends Phaser.Scene {
   private blockedTiles = new Set<string>();
   /** Trainer-battle placements (`STARTING_ZONE_TRAINERS`) already triggered this session - a one-time deterministic trigger, unlike wild encounters which re-roll every step. */
   private triggeredTrainerBattles = new Set<string>();
+  /** Live map sprite for each currently-alive persistent wild-Fusion
+   * placement (`STARTING_ZONE_WILD_FUSIONS`), keyed by placement id - see
+   * `buildWildFusions`/`handleWildFusionDefeated` and
+   * `src/world/wildFusionState.ts`. Absent entries are either defeated
+   * (mid-respawn cooldown) or not yet spawned this `create()`. */
+  private wildFusionSprites = new Map<string, Phaser.GameObjects.Image>();
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyW!: Phaser.Input.Keyboard.Key;
   private keyA!: Phaser.Input.Keyboard.Key;
@@ -127,6 +149,7 @@ export class WorldScene extends Phaser.Scene {
     // enterable") is the second zone to need this, alongside Fernbrook.
     if (this.zoneDef.zoneId === ZONE_ID) {
       this.buildNpcs(STARTING_ZONE_NPCS);
+      this.buildWildFusions();
     } else if (this.zoneDef.zoneId === FIELD_OFFICE_INTERIOR_ZONE_ID) {
       this.buildHealingSpot(INTERIOR_HEALING_SPOT);
       this.buildNpcs(FIELD_OFFICE_INTERIOR_NPCS);
@@ -268,6 +291,117 @@ export class WorldScene extends Phaser.Scene {
       }
       this.blockedTiles.add(`${placement.col},${placement.row}`);
     }
+  }
+
+  /** Persistent wild-Fusion world entities + their 2-minute respawn timer
+   * (TODO.md "Spawns & Encounters"). For each `STARTING_ZONE_WILD_FUSIONS`
+   * placement: if it's currently alive (per the wall-clock state in
+   * `src/world/wildFusionState.ts`, which is what actually survives a zone
+   * transition - see that file's doc comment), spawn its map sprite now; if
+   * it's mid-cooldown, schedule a real Phaser timer (`this.time.delayedCall`)
+   * for exactly the *remaining* delay so it flips back to alive and
+   * reappears at the right wall-clock moment even if some of its 2 minutes
+   * already elapsed while the player was in a different zone. Fernbrook-only
+   * - only called when `this.zoneDef.zoneId === ZONE_ID`. Unlike
+   * `buildNpcs`/`buildHealingSpot`, placements here don't block their tile:
+   * stepping onto one is the trigger (see `maybeTriggerWildFusionBattle`),
+   * the same step-on shape `STARTING_ZONE_TRAINERS` already uses, chosen
+   * over facing+interact since a wild creature standing in the open reads
+   * closer to "walk up and it fights you" than an NPC you deliberately talk
+   * to. */
+  private buildWildFusions(): void {
+    this.wildFusionSprites.forEach((sprite) => sprite.destroy());
+    this.wildFusionSprites.clear();
+
+    const spawnTable = ZONE_SPAWN_TABLES[this.zoneDef.zoneId];
+    for (const placement of STARTING_ZONE_WILD_FUSIONS) {
+      if (isWildFusionAlive(placement.id, spawnTable)) {
+        const { fusion } = getWildFusionState(placement.id, spawnTable);
+        this.spawnWildFusionSprite(placement, fusion);
+      } else {
+        const delay = getWildFusionRespawnDelayMs(placement.id);
+        this.time.delayedCall(delay, () => this.respawnWildFusion(placement));
+      }
+    }
+  }
+
+  /** Same on-demand-texture-generation approach `BattleScene.ensureFusionTexture`
+   * uses for battle sprites (cached by `fusion-${genome.id}`, so a Fusion
+   * already seen in battle or elsewhere on the map reuses the same texture) -
+   * duplicated here in miniature rather than shared, to keep the BattleScene
+   * diff this round minimal (see TODO.md task notes). */
+  private ensureFusionTexture(fusion: Fusion, onReady: (key: string) => void): void {
+    const key = `fusion-${fusion.genome.id}`;
+    if (this.textures.exists(key)) {
+      onReady(key);
+      return;
+    }
+    this.textures.once(`addtexture-${key}`, () => onReady(key));
+    const svg = buildCreatureSVG(fusion.phenotype, fusion.genome.visualSeed);
+    this.textures.addBase64(key, svgToDataUrl(svg));
+  }
+
+  private spawnWildFusionSprite(placement: WildFusionPlacement, fusion: Fusion): void {
+    this.ensureFusionTexture(fusion, (key) => {
+      // The texture loads asynchronously - guard against the sprite having
+      // been re-defeated (unlikely, but possible) or this scene already
+      // having moved on (a zone transition) by the time it's ready.
+      if (!this.scene.isActive() && !this.scene.isPaused()) return;
+      if (this.wildFusionSprites.has(placement.id)) return;
+      const sprite = this.add
+        .image(this.tileCenterX(placement.col), this.tileFloorY(placement.row) - TILE_SIZE / 4, key)
+        .setOrigin(0.5, 1)
+        .setDisplaySize(TILE_SIZE * 1.5, TILE_SIZE * 1.5)
+        .setDepth(4);
+      this.wildFusionSprites.set(placement.id, sprite);
+    });
+  }
+
+  /** Called (via the timer `buildWildFusions` schedules) once a defeated
+   * placement's cooldown has actually elapsed - re-checks `isWildFusionAlive`
+   * (rather than assuming the timer firing means it's alive) since it's the
+   * single source of truth, then re-spawns its sprite. */
+  private respawnWildFusion(placement: WildFusionPlacement): void {
+    if (this.zoneDef.zoneId !== ZONE_ID) return;
+    const spawnTable = ZONE_SPAWN_TABLES[this.zoneDef.zoneId];
+    if (!isWildFusionAlive(placement.id, spawnTable)) return;
+    const { fusion } = getWildFusionState(placement.id, spawnTable);
+    this.spawnWildFusionSprite(placement, fusion);
+  }
+
+  /** Stepping onto a placement's tile while it's alive starts a battle
+   * against that specific placement's Fusion (not a freshly-rolled one),
+   * with an outcome callback wired back to `handleWildFusionDefeated` - see
+   * `BattleScene`'s `WildBattleStartData.onDefeatedOrCaptured`. Sibling
+   * check to `maybeTriggerEncounter`/`maybeTriggerTrainerBattle`, same call
+   * site (the movement tween's `onComplete`). Fernbrook-only. */
+  private maybeTriggerWildFusionBattle(col: number, row: number): void {
+    if (this.scene.isActive('BattleScene') || this.zoneDef.zoneId !== ZONE_ID) return;
+    const placement = STARTING_ZONE_WILD_FUSIONS.find((p) => p.col === col && p.row === row);
+    if (!placement) return;
+    if (!this.wildFusionSprites.has(placement.id)) return; // already defeated / mid-cooldown
+
+    const spawnTable = ZONE_SPAWN_TABLES[this.zoneDef.zoneId];
+    const { fusion } = getWildFusionState(placement.id, spawnTable);
+    concordRegistry.register(fusion.genome, fusion.phenotype);
+    this.scene.pause();
+    this.scene.launch('BattleScene', {
+      wildFusion: fusion,
+      onDefeatedOrCaptured: () => this.handleWildFusionDefeated(placement),
+    } satisfies BattleStartData);
+  }
+
+  /** Outcome callback for a persistent wild-Fusion placement's battle - only
+   * ever invoked on a win or a successful capture (see
+   * `WildBattleStartData.onDefeatedOrCaptured`'s doc comment), never a run
+   * or a loss. Removes its map sprite immediately and starts its 2-minute
+   * respawn window (`markWildFusionDefeated`), scheduling this scene's own
+   * Phaser timer to bring it back if the player is still around to see it. */
+  private handleWildFusionDefeated(placement: WildFusionPlacement): void {
+    markWildFusionDefeated(placement.id);
+    this.wildFusionSprites.get(placement.id)?.destroy();
+    this.wildFusionSprites.delete(placement.id);
+    this.time.delayedCall(getWildFusionRespawnDelayMs(placement.id), () => this.respawnWildFusion(placement));
   }
 
   /** Faces the tile the player is currently facing and, if it's the healing
@@ -446,6 +580,7 @@ export class WorldScene extends Phaser.Scene {
         // --- end zone-transition check ---
         this.maybeTriggerEncounter(targetCol, targetRow);
         this.maybeTriggerTrainerBattle(targetCol, targetRow);
+        this.maybeTriggerWildFusionBattle(targetCol, targetRow);
       },
     });
   }
