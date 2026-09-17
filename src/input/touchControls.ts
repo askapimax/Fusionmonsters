@@ -1,13 +1,15 @@
 import type { FacingDirection } from '../data/character';
 
 /**
- * On-screen movement buttons (index.html's #touch-controls D-pad). Rendered
- * as plain HTML/CSS, not Phaser UI, so they get real touch-target sizing
- * and behave identically to clicking with a mouse - shown on both mobile
- * and desktop, alongside keyboard input, not instead of it.
+ * On-screen movement + Start buttons (index.html's #touch-controls).
+ * Rendered as plain HTML/CSS, not Phaser UI, so they get real touch-target
+ * sizing and behave identically to clicking with a mouse - shown on both
+ * mobile and desktop, alongside keyboard input, not instead of it.
  */
 class TouchControlsState {
   direction: FacingDirection | null = null;
+  /** Set by whoever owns the pause menu (WorldScene); called once per Start press. */
+  onStart: (() => void) | null = null;
 }
 
 export const touchControls = new TouchControlsState();
@@ -38,4 +40,13 @@ export function attachTouchControls(rootId: string): void {
     button.addEventListener('pointerleave', release);
     button.addEventListener('pointercancel', release);
   });
+
+  const startButton = root.querySelector<HTMLButtonElement>('#start-btn');
+  startButton?.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    startButton.classList.add('is-pressed');
+    touchControls.onStart?.();
+  });
+  startButton?.addEventListener('pointerup', () => startButton.classList.remove('is-pressed'));
+  startButton?.addEventListener('pointerleave', () => startButton.classList.remove('is-pressed'));
 }

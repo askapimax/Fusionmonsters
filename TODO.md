@@ -60,6 +60,29 @@ reality.
       Playwright's iPhone 13 device emulation and a real (non-instant)
       held touch press, since a synthetic `.tap()` turned out to be faster
       than Phaser's update loop and gave a false negative.
+- [x] Fixed mobile browsers pushing the control bar off-screen: `100vh`
+      doesn't account for a collapsible address bar. `index.html` now
+      measures the real visible height via `window.innerHeight` (kept
+      current on resize/orientationchange). Verified the mechanism by
+      overriding `innerHeight` to a smaller value than the CSS viewport
+      before page scripts ran, since Playwright's emulated viewport has
+      no real address-bar-driven vh/innerHeight gap to reproduce directly.
+- [x] Game Boy-style Start button (`index.html`, next to the D-pad; also
+      bound to Enter on keyboard) opening a pause menu
+      (`src/scenes/PauseMenuScene.ts`): INVENTORY, SAVE (present but
+      intentionally inert - shows "Not available yet."), CLOSE. Options
+      are directly clickable/tappable, not D-pad-navigated, since there's
+      no A/B button yet (see To Do below).
+- [x] Inventory screen (`src/scenes/InventoryScene.ts`), Pokemon-bag-style
+      empty item grid, plus the data it reads from
+      (`src/data/items.ts` - empty item catalog, `src/state/inventory.ts` -
+      empty player inventory) and a shared UI panel style
+      (`src/ui/panel.ts`) reused by both menu screens. Verified the full
+      flow via headless browser: open via Enter and via the Start button,
+      confirmed a second Enter press closes rather than double-opening,
+      SAVE's notice appears and auto-dismisses without closing the menu,
+      opening/closing Inventory returns cleanly to gameplay, and movement
+      still works afterward (menu doesn't leave input stuck).
 
 ## To Do
 
@@ -72,8 +95,6 @@ reality.
       yet).
 - [ ] NPCs, dialogue, and making the field office enterable (it's
       currently a solid decorative block).
-- [ ] Walk animation (the character currently just slides tile-to-tile
-      with a static per-direction pose, no leg-cycle frames).
 
 ### Spawns & Encounters
 - [ ] Per-zone spawn tables (which Fusions can appear, with individual
@@ -107,8 +128,18 @@ reality.
 - [ ] Story content: Chimera Nine encounters, the Unraveling plot beats.
 
 ### Persistence & Platform
-- [ ] Save/load (local storage first, per README Tech Stack).
+- [ ] Save/load (local storage first, per README Tech Stack). The pause
+      menu already has a SAVE entry (`src/scenes/PauseMenuScene.ts`) -
+      it currently just shows "Not available yet." and needs real
+      save-state logic wired in.
 - [ ] Decide on and build the game's main menu / UI shell.
+- [ ] A/B action buttons to match the Start button already added, and
+      D-pad-navigable menus (currently pause menu / inventory options
+      are click/tap-only, which works but isn't full Game-Boy-style
+      input parity).
+- [ ] Actual items in `src/data/items.ts` and ways to obtain them - the
+      inventory screen is built and correctly renders whatever's there,
+      but nothing populates it yet.
 
 ### Art & Audio
 - [x] Re-polished the procedural Fusion-part generator (`pixelArt.ts`):

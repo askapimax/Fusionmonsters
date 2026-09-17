@@ -40,13 +40,16 @@
       }
 
       /* Movement controls: always rendered (useful on desktop too, not just
-         touch devices - clicking works exactly like tapping). */
+         touch devices - clicking works exactly like tapping). Grid keeps
+         the D-pad visually centered while the Start button sits in its own
+         column to the right, instead of the two fighting over flexbox
+         centering. */
       #touch-controls {
         flex: 0 0 auto;
         height: 168px;
-        display: flex;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
         align-items: center;
-        justify-content: center;
         background: #0a0a12;
         border-top: 1px solid #23232e;
         touch-action: none;
@@ -54,9 +57,37 @@
       }
 
       .dpad {
+        grid-column: 2;
         position: relative;
         width: 156px;
         height: 156px;
+      }
+
+      /* Game Boy-style Start button: small dark pill, off to the side of
+         the D-pad rather than part of it. */
+      .start-btn-wrap {
+        grid-column: 3;
+        justify-self: start;
+      }
+
+      .start-btn {
+        width: 76px;
+        height: 28px;
+        border-radius: 14px;
+        background: #2a2a35;
+        color: #e8e8f0;
+        border: 2px solid #454555;
+        font-size: 11px;
+        font-family: monospace;
+        letter-spacing: 1px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .start-btn:active,
+      .start-btn.is-pressed {
+        background: #3f7f6b;
+        border-color: #5fa38c;
       }
 
       .dpad-btn {
@@ -109,6 +140,9 @@
           <button class="dpad-btn dpad-left" data-dir="left" aria-label="Move left">&#9664;</button>
           <button class="dpad-btn dpad-right" data-dir="right" aria-label="Move right">&#9654;</button>
           <button class="dpad-btn dpad-down" data-dir="down" aria-label="Move down">&#9660;</button>
+        </div>
+        <div class="start-btn-wrap">
+          <button id="start-btn" class="start-btn" aria-label="Open menu">START</button>
         </div>
       </div>
     </div>

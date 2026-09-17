@@ -76,7 +76,12 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setZoom(3);
 
     this.add
-      .text(8, 8, `${ZONE_NAME}\nArrow keys / WASD, or the on-screen D-pad, to move`, { fontSize: '11px', color: '#ffffff' })
+      .text(
+        8,
+        8,
+        `${ZONE_NAME}\nArrow keys / WASD, or the on-screen D-pad, to move\nEnter or Start to open the menu`,
+        { fontSize: '11px', color: '#ffffff' },
+      )
       .setScrollFactor(0)
       .setDepth(100);
 
@@ -85,6 +90,15 @@ export class WorldScene extends Phaser.Scene {
     this.keyA = this.input.keyboard!.addKey('A');
     this.keyS = this.input.keyboard!.addKey('S');
     this.keyD = this.input.keyboard!.addKey('D');
+
+    touchControls.onStart = () => this.openMenu();
+    this.input.keyboard!.on('keydown-ENTER', () => this.openMenu());
+  }
+
+  private openMenu(): void {
+    if (this.scene.isActive('PauseMenuScene')) return;
+    this.scene.pause();
+    this.scene.launch('PauseMenuScene');
   }
 
   private buildGroundLayer(): void {

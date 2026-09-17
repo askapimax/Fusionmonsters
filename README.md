@@ -127,6 +127,20 @@ than just described here - see `src/world/startingZone.ts` and
   available space (`Phaser.Scale.FIT`, top-aligned so any leftover
   space collects next to the control bar instead of above the game
   view), so this works on both phone and desktop viewports.
+- A Game Boy-style Start button sits next to the D-pad (also bound to
+  Enter on keyboard) and opens a pause menu (`src/scenes/PauseMenuScene.ts`):
+  INVENTORY, SAVE, CLOSE. Options are directly clickable/tappable rather
+  than requiring D-pad navigation + a confirm button, since there's no
+  "A" button yet. SAVE is a real, present menu entry that intentionally
+  does nothing yet beyond a "Not available yet." notice - see TODO.md.
+- INVENTORY opens `src/scenes/InventoryScene.ts`: a Pokemon-bag-style
+  grid of item slots, in the same dark-panel/monospace UI style as the
+  pause menu (`src/ui/panel.ts`). It's real, data-driven UI, not a
+  placeholder screen - it reads from `src/data/items.ts` (the item
+  catalog) and `src/state/inventory.ts` (what the player is carrying),
+  both intentionally empty for now, so every slot renders empty rather
+  than the screen faking a populated bag. Adding real items later is a
+  data change, not a UI rebuild.
 
 Run it: `npm install && npm run dev`.
 
